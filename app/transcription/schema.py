@@ -1,0 +1,114 @@
+from pydantic import BaseModel
+from typing import Annotated
+from sqlmodel import SQLModel, Field
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
+from enum import Enum
+from fastapi import UploadFile,File,Form
+
+
+class SupportedSite:
+    Youtube = "Youtube"
+    FileUpload = "FileUpload"
+
+
+class TranscriptStatus(Enum):
+    Uploading = 0
+    InQueue = 1
+    Transcripting = 2
+    Finish = 3
+
+
+class Transcript(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
+
+    id: UUID = Field(primary_key=True, default_factory=uuid4)
+    original_source: str = Field(default=SupportedSite.FileUpload)
+    resource_id: str | None = Field(default=None, index=True)
+    resource_url: str = Field()
+    thumnail_url: str = Field()
+    name: str = Field()
+    date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    data: str | None = Field(default=None)
+    status: int = Field(default=TranscriptStatus.Uploading.value, index=True)
+    public: bool = Field(default=True)
+
+
+class TranscriptionHistory(SQLModel, table=True):
+    """
+    Acts as the persistent job queue.
+    One row per transcription attempt.
+    The worker polls this table for pending jobs ordered by queued_at.
+    """
+    __table_args__ = {"extend_existing": True}
+
+    id: UUID = Field(primary_key=True, default_factory=uuid4)
+    transcript_id: UUID = Field(foreign_key="transcript.id", index=True)
+    # queued | processing | done | failed
+    job_status: str = Field(default="queued", index=True)
+    queued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime | None = Field(default=None)
+    finished_at: datetime | None = Field(default=None)
+    error: str | None = Field(default=None)
+
+
+# ── Request / Response schemas ────────────────────────────────────────────────
+
+
+class YoutubeTranscriptRequestForm(BaseModel):
+    name: str
+    resource_id: str | None = None
+    original_source: str = SupportedSite.Youtube
+    public: bool = True
+    resource_id: str
+    thumbnail_url : str
+    resource_url : str
+    original_source: str = SupportedSite.Youtube
+
+
+
+class TranscriptRequestResponse(BaseModel):
+    transcript_id: UUID
+    success: bool
+
+
+class TranscriptStatusRequest(BaseModel):
+    transcript_id : UUID
+
+
+
+class TranscriptStatusResponse(BaseModel):
+    done: bool
+    msg: str
+
+class TranscriptInfoRequest(BaseModel):
+    transcript_id : UUID
+
+
+class TranscriptInfoResponse(BaseModel):
+    id: UUID
+    original_source: str
+    thumnail_url: str
+    resource_url: str
+    resource_id: str | None
+    status: int
+
+
+
+
+class TokenTimestamp(BaseModel):
+    start: float | None
+    end: float | None
+    token: str
+
+class TranscriptSegment(BaseModel):
+    text : str
+    words: list[TokenTimestamp]
+
+class TranscriptResult(BaseModel):
+    segments : list[TranscriptSegment]
+
+
+class ErrorMessage(BaseModel):
+    msg: str
+
