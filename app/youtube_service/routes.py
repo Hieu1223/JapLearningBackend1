@@ -6,7 +6,7 @@ from typing import List
 from .yt_dl_service import *
 from .schema import *
 
-router = APIRouter(prefix="/youtube", tags=["YouTube"])
+router = APIRouter(tags=["YouTube"])
 
 
 @router.get("/search", response_model=List[VideoPreview])

@@ -9,7 +9,8 @@ from .schema import (
 )
 from uuid import UUID
 from datetime import datetime, timezone
-
+from ..youtube_service.schema import VideoPreview
+from ..youtube_service.yt_dl_service import get_video_by_id
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(DATABASE_URL)
@@ -122,6 +123,7 @@ def check_exist_and_create_transcription_entry(
     Idempotent: if this resource was already submitted return its info.
     Otherwise create a Transcript with status=InQueue and return info.
     """
+
     if form.resource_id:
         existing = get_transcript_by_resource(session, form.resource_id, form.original_source)
         if existing:

@@ -54,6 +54,8 @@ class TranscriptionHistory(SQLModel, table=True):
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
+class YoutubeIDTranscriptRequestForm(BaseModel):
+    resource_id : str
 
 class YoutubeTranscriptRequestForm(BaseModel):
     name: str
@@ -63,8 +65,7 @@ class YoutubeTranscriptRequestForm(BaseModel):
     resource_id: str
     thumbnail_url : str
     resource_url : str
-    original_source: str = SupportedSite.Youtube
-
+    
 
 
 class TranscriptRequestResponse(BaseModel):
