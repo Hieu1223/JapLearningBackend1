@@ -1,7 +1,3 @@
-import asyncio
-
-asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 

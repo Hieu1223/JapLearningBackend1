@@ -12,7 +12,7 @@ proxy = {
 async def extract_search_vrf_async(base_url, search_query):
     
     # Use AsyncCamoufox for asynchronous operation
-    async with AsyncCamoufox(headless=False,geoip=True, proxy = proxy) as browser:
+    async with AsyncCamoufox(headless=True,geoip=True, proxy = proxy) as browser:
         page = await browser.new_page()
         
         print(f"Navigating to {base_url}...")
