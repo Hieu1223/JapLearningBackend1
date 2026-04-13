@@ -3,11 +3,16 @@ import os
 import random
 from urllib.parse import urlparse, parse_qs
 import asyncio
+proxy = {
+    'server' : os.getenv("PROXY_SERVER"),
+    'username' : os.getenv("PROXY_USERNAME"),
+    'password' : os.getenv("PROXY_PASSWORD")
+}
 
 async def extract_search_vrf_async(base_url, search_query):
     
     # Use AsyncCamoufox for asynchronous operation
-    async with AsyncCamoufox(headless=True) as browser:
+    async with AsyncCamoufox(headless=False,geoip=True, proxy = proxy) as browser:
         page = await browser.new_page()
         
         print(f"Navigating to {base_url}...")
@@ -40,7 +45,7 @@ async def get_mangafire_images_url(chapter_url):
     """
     final_url = None
 
-    async with AsyncCamoufox(headless=True) as browser:
+    async with AsyncCamoufox(headless=True,geoip=True,proxy = proxy) as browser:
         page = await browser.new_page()
 
         # Listener to catch the specific request
