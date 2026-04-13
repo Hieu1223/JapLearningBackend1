@@ -1,34 +1,10 @@
-from typing import Annotated
+
+from .schema import *
 from sqlmodel import Session, SQLModel, create_engine, select
-from fastapi import Depends
 import json
-import os
-from .schema import (
-    Transcript, TranscriptStatus,
-    YoutubeTranscriptRequestForm, TranscriptInfoResponse,
-)
 from uuid import UUID
-from datetime import datetime, timezone
-from ..youtube_service.schema import VideoPreview
-from ..youtube_service.yt_dl_service import get_video_by_id
-
-DATABASE_URL = os.environ["DATABASE_URL"]
-engine = create_engine(DATABASE_URL)
 
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-SessionDep = Annotated[Session, Depends(get_session)]
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def to_info(t: Transcript) -> TranscriptInfoResponse:
     return TranscriptInfoResponse(

@@ -3,23 +3,21 @@ from uuid import UUID
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlmodel import Session, select
-from .schema import (
+from ..database import (
     Transcript,
-    TranscriptRequestResponse,
-    TranscriptInfoResponse,
-    TranscriptStatusResponse,
-    TranscriptResult,
     TranscriptStatus,
-    YoutubeTranscriptRequestForm
 )
+from ..database import *
 from .transcribe_pipeline import transcribe_upload
-from .db import (
+from ..database import (
     SessionDep, engine,
     check_exist_and_create_transcription_entry,
     get_transcript_by_resource,
     to_info,
 )
 import json
+from typing import Optional
+
 
 router = APIRouter(tags=["transcription"])
 
@@ -146,8 +144,16 @@ async def transcribe_from_site(
     background_tasks: BackgroundTasks,
     session: SessionDep,
 ) -> TranscriptRequestResponse:
-    """Generic endpoint for any supported site (YouTube, etc.)"""
     info = check_exist_and_create_transcription_entry(session, form)
     if info.status == TranscriptStatus.InQueue.value:
         background_tasks.add_task(_bg_transcribe, form)
     return TranscriptRequestResponse(transcript_id=info.id, success=True)
+
+
+@router.get("/history/{user_id}")
+async def get_transcription_history(
+    user_id : int,
+    offset: Optional[int],
+    limit : Optional[int]
+    ):
+    pass

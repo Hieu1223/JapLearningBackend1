@@ -35,21 +35,12 @@ class Transcript(SQLModel, table=True):
 
 
 class TranscriptionHistory(SQLModel, table=True):
-    """
-    Acts as the persistent job queue.
-    One row per transcription attempt.
-    The worker polls this table for pending jobs ordered by queued_at.
-    """
     __table_args__ = {"extend_existing": True}
 
     id: UUID = Field(primary_key=True, default_factory=uuid4)
+    user_id : UUID = Field(foreign_key="user.id") 
     transcript_id: UUID = Field(foreign_key="transcript.id", index=True)
-    # queued | processing | done | failed
-    job_status: str = Field(default="queued", index=True)
-    queued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    started_at: datetime | None = Field(default=None)
-    finished_at: datetime | None = Field(default=None)
-    error: str | None = Field(default=None)
+    date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
@@ -65,6 +56,7 @@ class YoutubeTranscriptRequestForm(BaseModel):
     resource_id: str
     thumbnail_url : str
     resource_url : str
+    user_id: UUID
     
 
 

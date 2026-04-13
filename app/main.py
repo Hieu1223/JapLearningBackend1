@@ -1,3 +1,7 @@
+import asyncio
+
+asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,9 +10,12 @@ load_dotenv()
 from typing import Annotated
 from fastapi import FastAPI
 from .routes import *
-from .transcription import create_db_and_tables
-app = FastAPI()
+from .user_management import *
+from .database import create_db_and_tables
+import asyncio
 
+
+app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],           # Allowed domains
@@ -21,12 +28,14 @@ app.add_middleware(
 def on_startup():
     create_db_and_tables()
 
+
 @app.get("/ping")
 def ping():
     return {"status": "ok"}
 
 app.include_router(tokenization_router, prefix="/tokenization")
-app.include_router(security_router)
+app.include_router(security_router, tags=["Security"])
 app.include_router(transcription_router, prefix="/transcription")
 app.include_router(youtube_router, prefix='/youtube')
 app.include_router(flashcard_router, prefix='/flashcard')
+app.include_router(manga_reader_router, prefix='/manga')
