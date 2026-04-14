@@ -1,15 +1,19 @@
 from dotenv import load_dotenv
-from fastapi.middleware.cors import CORSMiddleware
-
 load_dotenv()
+import asyncio
+import sys
 
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Annotated
 from fastapi import FastAPI
 from .routes import *
 from .user_management import *
 from .database import create_db_and_tables
-import asyncio
-
 
 app = FastAPI()
 app.add_middleware(
