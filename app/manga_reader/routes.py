@@ -1,38 +1,62 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from typing import Optional
-from ..database import (
-    SessionDep
-)
+from ..database import SessionDep
 from .manga_extractor import MangafireExtractor
 
-router = APIRouter(tags = ['Manga'])
+router = APIRouter(tags=['Manga'])
 
 
 @router.get("/search")
 async def search_manga(
     session: SessionDep,
-    query : Optional[str],
+    query: Optional[str],
 ):
-    mangas = await MangafireExtractor(session).search(query)
-    return mangas
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    try:
+        return await MangafireExtractor(session).search(query)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get('/chapter_list')
 async def get_chapter_list(
-    session : SessionDep,
-    manga_url : str
+    session: SessionDep,
+    manga_url: str
 ):
-    return await MangafireExtractor(session).get_chapter_list(manga_url)
+    if not manga_url:
+        raise HTTPException(status_code=400, detail="manga_url is required")
+
+    try:
+        return await MangafireExtractor(session).get_chapter_list(manga_url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get('/read')
 async def get_images(
-    session : SessionDep,
-    chapter_url : str
+    session: SessionDep,
+    chapter_url: str
 ):
-    return await MangafireExtractor(session).get_chapter_images(chapter_url)
+    if not chapter_url:
+        raise HTTPException(status_code=400, detail="chapter_url is required")
+
+    try:
+        return await MangafireExtractor(session).get_chapter_images(chapter_url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get('/ocr_data')
 async def get_ocr_data(
     session: SessionDep,
-    chapter_url : str
+    chapter_url: str
 ):
-    pass
+    if not chapter_url:
+        raise HTTPException(status_code=400, detail="chapter_url is required")
+
+    try:
+        return {"message": "OCR not implemented yet"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
