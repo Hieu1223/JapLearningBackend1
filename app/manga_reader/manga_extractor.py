@@ -58,7 +58,7 @@ class MangafireExtractor:
         query = query.lower()
         search_vrf = get_cached_search_vrf_token(self.session, query)
         if not search_vrf:
-            search_vrf = await extract_search_vrf_async(BASE_URL,query)
+            search_vrf = await extract_search_vrf_async(query)
             print(search_vrf)
             update_cached_search_vrf_token(self.session,query,search_vrf)
         mangas = self.crawl_search_page(query,0, search_vrf)
