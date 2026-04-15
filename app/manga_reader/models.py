@@ -1,8 +1,6 @@
-from typing import Literal
+MangaCategories = ['manga' , 'one-shot' , 'doujinshi' , 'novel' , 'manhwa' , 'manhua']
 
-MangaCategories = Literal['manga' , 'one-shot' , 'doujinshi' , 'novel' , 'manhwa' , 'manhua']
-
-MANGA_GENRES =  Literal [
+MANGA_GENRES = [
     'action',
     'adventure',
     'cars',

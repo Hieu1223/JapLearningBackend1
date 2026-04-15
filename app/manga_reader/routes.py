@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 from ..database import SessionDep
 from .manga_extractor import MangafireExtractor
-
+from .manga_ocr import do_ocr
 router = APIRouter(tags=['Manga'])
 
 
@@ -57,6 +57,6 @@ async def get_ocr_data(
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
     try:
-        return {"message": "OCR not implemented yet"}
+        return await do_ocr(session,chapter_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

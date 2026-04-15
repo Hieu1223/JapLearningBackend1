@@ -76,5 +76,5 @@ class MangafireExtractor:
         if not image_urls:
             image_urls = await get_mangafire_images_url(BASE_URL + chapter_url)
         data = self.get_raw(image_urls).json()
-        images = data['result']['images']
+        images =[img[0] for img in data['result']['images']]
         return images
