@@ -3,6 +3,7 @@ from typing import Optional
 from ..database import SessionDep
 from .manga_extractor import MangafireExtractor
 from .manga_ocr import do_ocr
+from .schema import MangaInfo,ChapterInfo,OCRResponse
 router = APIRouter(tags=['Manga'])
 
 
@@ -10,7 +11,7 @@ router = APIRouter(tags=['Manga'])
 async def search_manga(
     session: SessionDep,
     query: Optional[str],
-):
+) -> list[MangaInfo]:
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
@@ -24,7 +25,7 @@ async def search_manga(
 async def get_chapter_list(
     session: SessionDep,
     manga_url: str
-):
+) -> list[ChapterInfo]:
     if not manga_url:
         raise HTTPException(status_code=400, detail="manga_url is required")
 
@@ -38,7 +39,7 @@ async def get_chapter_list(
 async def get_images(
     session: SessionDep,
     chapter_url: str
-):
+) -> list[str]:
     if not chapter_url:
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
@@ -52,7 +53,7 @@ async def get_images(
 async def get_ocr_data(
     session: SessionDep,
     chapter_url: str
-):
+) -> OCRResponse:
     if not chapter_url:
         raise HTTPException(status_code=400, detail="chapter_url is required")
 

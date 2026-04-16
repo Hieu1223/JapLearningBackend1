@@ -16,10 +16,7 @@ class Manga(SQLModel, table = True):
 
 class Chapter(SQLModel, table = True):
     id : UUID = Field(primary_key=True, default_factory=uuid4)
-    manga_id : UUID = Field(foreign_key='manga.id')
-    num : int = Field()
     link : str = Field()
-    title : str = Field()
     transcripted : bool = Field(default=False)
     ocr_data : str = Field(default="")
     image_list : str = Field(default="{}")

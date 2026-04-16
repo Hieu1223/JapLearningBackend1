@@ -9,12 +9,14 @@ from .utils import extract_search_vrf_async,get_mangafire_images_url
 from .schema import (
     MangaInfo
 )
+from ..database.manga_reader.schema import Chapter
+from sqlmodel import select
 
 import os
 import requests
 from .crawler import extract_from_page,extract_chapters
 import asyncio
-
+import json
 
 BASE_URL = os.getenv("BASE_URL", "https://mangafire.to")
 
@@ -71,10 +73,47 @@ class MangafireExtractor:
         html = self.get(manga_url).text
         return extract_chapters(html)
 
-    async def get_chapter_images(self,chapter_url):
-        image_urls = get_cached_chapter_info(self.session, chapter_url)
-        if not image_urls:
-            image_urls = await get_mangafire_images_url(chapter_url)
-        data = self.get_raw(image_urls).json()
-        images =[img[0] for img in data['result']['images']]
+
+
+    async def get_chapter_images(self, chapter_url: str):
+        # 1. Look for the chapter in your new CachedChapter table
+        statement = select(Chapter).where(Chapter.link == chapter_url)
+        chapter = self.session.exec(statement).first()
+        
+        # 2. CACHE HIT: If exists and has images, return them immediately
+        if chapter and chapter.image_list and chapter.image_list != "{}":
+            print(f"Cache Hit for images: {chapter_url}")
+            return json.loads(chapter.image_list)
+
+        # 3. CACHE MISS: We need to fetch from the source
+        print(f"Cache Miss for images: {chapter_url}. Fetching...")
+        
+        # Get the AJAX URL from your remote extractor
+        ajax_url = await get_mangafire_images_url(chapter_url)
+        response = self.get_raw(ajax_url)
+        data = response.json()
+        
+        # Parse the image list
+        images = [img[0] for img in data['result']['images']]
+        
+        if not images:
+            raise Exception(f"Failed to extract images for: {chapter_url}")
+
+        # 4. CREATE OR UPDATE: If chapter didn't exist, initialize it.
+        if not chapter:
+            chapter = Chapter(
+                link=chapter_url,
+                image_list=json.dumps(images)
+            )
+            print(f"Created new CachedChapter record for: {chapter_url}")
+        else:
+            # If record existed but image_list was empty
+            chapter.image_list = json.dumps(images)
+            print(f"Updated existing CachedChapter record for: {chapter_url}")
+
+        # 5. Persist to DB
+        self.session.add(chapter)
+        self.session.commit()
+        self.session.refresh(chapter)
+            
         return images
