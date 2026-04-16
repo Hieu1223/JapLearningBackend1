@@ -5,20 +5,6 @@ from ..database.manga_reader.queries import (
     update_chapter_ocr
 )
 from .schema import OCRPage
-import numpy as np
-
-def sanitize_for_json(obj):
-    if isinstance(obj, dict):
-        return {k: sanitize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [sanitize_for_json(i) for i in obj]
-    elif isinstance(obj, (np.int32, np.int64)):
-        return int(obj)
-    elif isinstance(obj, (np.float32, np.float64)):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    return obj
 
 # Initialize the remote Modal class
 ocr = modal.Cls.from_name("manga-ocr-threaded-app", "OCR")()
