@@ -12,11 +12,12 @@ from .schema import (
     AddCardRequest, 
     CardSRDataResponse
 )
+from ..security.auth import CurrentUser
 router = APIRouter()
 
 @router.get("/decks", response_model=List[DeckResponse])
 def read_decks(
-    user_id: UUID, 
+    user_id: CurrentUser, 
     session: Session = Depends(get_session)
 ):
     """Returns all decks saved by the user with their SRS stats."""

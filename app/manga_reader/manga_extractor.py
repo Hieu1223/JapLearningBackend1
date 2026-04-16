@@ -74,7 +74,7 @@ class MangafireExtractor:
     async def get_chapter_images(self,chapter_url):
         image_urls = get_cached_chapter_info(self.session, chapter_url)
         if not image_urls:
-            image_urls = await get_mangafire_images_url(BASE_URL + chapter_url)
+            image_urls = await get_mangafire_images_url(chapter_url)
         data = self.get_raw(image_urls).json()
         images =[img[0] for img in data['result']['images']]
         return images

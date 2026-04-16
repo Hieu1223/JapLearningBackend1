@@ -4,7 +4,8 @@ from fastapi import Depends
 import os
 from .user import User
 from .transcription import Transcript,TranscriptionHistory
-
+from .manga_reader import *
+from .security import *
 
 
 

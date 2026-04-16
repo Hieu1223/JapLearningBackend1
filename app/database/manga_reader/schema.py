@@ -21,14 +21,8 @@ class Chapter(SQLModel, table = True):
     link : str = Field()
     title : str = Field()
     transcripted : bool = Field(default=False)
-    
-
-class Page(SQLModel, table = True):
-    id : UUID = Field(primary_key=True, default_factory=uuid4)
-    chapter_id : UUID = Field(foreign_key='chapter.id')
-    image_url : str = Field()
     ocr_data : str = Field(default="")
-    page_num : int = Field()
+    image_list : str = Field(default="{}")
 
 
 class ReadHistory(SQLModel, table = True):
