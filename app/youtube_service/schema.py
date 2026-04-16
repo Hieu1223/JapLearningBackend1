@@ -126,6 +126,12 @@ class VideoInfo(BaseModel):
         )
 
 
+class VideoHistory(BaseModel):
+    pass
+
+
+
+
 class ChannelVideosResponse(BaseModel):
     channel: ChannelInfo
     videos: List[VideoPreview]

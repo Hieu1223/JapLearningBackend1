@@ -1,36 +1,39 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from typing import Annotated, Optional, List
 from uuid import UUID
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, BackgroundTasks
-from sqlmodel import Session, select
+import json
+from sqlmodel import select
+from ..database import SessionDep, engine, Transcript, TranscriptStatus
 from ..database import (
-    Transcript,
-    TranscriptStatus,
-)
-from ..database import *
-from .transcribe_pipeline import transcribe_upload
-from ..database import (
-    SessionDep, engine,
     check_exist_and_create_transcription_entry,
     get_transcript_by_resource,
+    get_user_history,
+    remove_history_entry,
     to_info,
 )
-import json
-from typing import Optional
+from .schema import (
+    TranscriptInfoResponse,
+    TranscriptStatusResponse,
+    TranscriptResult,
+    TranscriptRequestResponse,
+    YoutubeTranscriptRequestForm,
+    UserHistoryListResponse,
+    RemoveHistoryRequest
+)
+from ..security.auth import CurrentUser
+from .transcribe_pipeline import transcribe_upload
 
-
-router = APIRouter(tags=["transcription"])
+router = APIRouter(tags=["Transcription"])
 
 
 # ── List public transcripts (paginated) ───────────────────────────────────────
 
-@router.get("/transcribe")
+@router.get("/transcribe", response_model=List[TranscriptInfoResponse])
 async def list_public_transcripts(
     session: SessionDep,
     page: int = 1,
     page_size: int = 20,
-) -> list[TranscriptInfoResponse]:
-    """Returns a paginated list of all public transcripts, newest first."""
+):
     results = session.exec(
         select(Transcript)
         .where(Transcript.public == True)
@@ -40,8 +43,7 @@ async def list_public_transcripts(
     ).all()
     return [to_info(t) for t in results]
 
-
-# ── Status only ───────────────────────────────────────────────────────────────
+# ── Status & Info ─────────────────────────────────────────────────────────────
 
 def _to_status(t: Transcript) -> TranscriptStatusResponse:
     return TranscriptStatusResponse(
@@ -49,111 +51,67 @@ def _to_status(t: Transcript) -> TranscriptStatusResponse:
         msg=TranscriptStatus(t.status).name,
     )
 
-
 @router.post("/transcribe/status")
-async def batch_status(
-    ids: list[UUID],
-    session: SessionDep,
-) -> dict[str, TranscriptStatusResponse | None]:
-    """Returns only the status for each transcript ID."""
+async def batch_status(ids: List[UUID], session: SessionDep):
     return {
         str(id): _to_status(t) if (t := session.get(Transcript, id)) else None
         for id in ids
     }
 
-
-class ResourceQuery(BaseModel):
-    resource_id: str
-    original_source: str
-
-
-@router.post("/transcribe/status/resource")
-async def batch_status_by_resource(
-    resources: list[ResourceQuery],
-    session: SessionDep,
-) -> dict[str, TranscriptStatusResponse | None]:
-    """Returns only the status for each {resource_id, original_source} pair."""
-    return {
-        r.resource_id: _to_status(t) if (t := get_transcript_by_resource(session, r.resource_id, r.original_source)) else None
-        for r in resources
-    }
-
-
-# ── Info ──────────────────────────────────────────────────────────────────────
-
-@router.get("/transcribe/{id}/info")
-async def get_info(
-    id: UUID,
-    session: SessionDep,
-) -> TranscriptInfoResponse | None:
-    """Returns full transcript metadata by ID."""
+@router.get("/transcribe/{id}/info", response_model=Optional[TranscriptInfoResponse])
+async def get_info(id: UUID, session: SessionDep):
     t = session.get(Transcript, id)
     return to_info(t) if t else None
 
-
-@router.get("/transcribe/resource/{original_source}/{resource_id}/info")
-async def get_info_by_resource(
-    resource_id: str,
-    original_source: str,
-    session: SessionDep,
-) -> TranscriptInfoResponse | None:
-    """Returns full transcript metadata by resource_id and source site."""
-    t = get_transcript_by_resource(session, resource_id, original_source)
-    return to_info(t) if t else None
-
-
-# ── Transcript data ───────────────────────────────────────────────────────────
-
-@router.get("/transcribe/{id}/data")
-async def get_data(
-    id: UUID,
-    session: SessionDep,
-) -> TranscriptResult | None:
-    """Returns transcript result data by ID."""
+@router.get("/transcribe/{id}/data", response_model=Optional[TranscriptResult])
+async def get_data(id: UUID, session: SessionDep):
     t = session.get(Transcript, id)
     if not t or not t.data:
         return None
     return TranscriptResult(**json.loads(t.data))
 
-
-@router.get("/transcribe/resource/{original_source}/{resource_id}/data")
-async def get_data_by_resource(
-    resource_id: str,
-    original_source: str,
-    session: SessionDep,
-) -> TranscriptResult | None:
-    """Returns transcript result data by resource_id and source site."""
-    t = get_transcript_by_resource(session, resource_id, original_source)
-    if not t or not t.data:
-        return None
-    return TranscriptResult(**json.loads(t.data))
-
-
-# ── Background task runner ────────────────────────────────────────────────────
+# ── Submit jobs (Authenticated) ───────────────────────────────────────────────
 
 def _bg_transcribe(form: YoutubeTranscriptRequestForm):
+    from sqlmodel import Session
     with Session(engine) as session:
         transcribe_upload(session, form)
 
-
-# ── Submit jobs ───────────────────────────────────────────────────────────────
-
-@router.post("/transcribe/youtube")
+@router.post("/transcribe/youtube", response_model=TranscriptRequestResponse)
 async def transcribe_from_site(
-    form: Annotated[YoutubeTranscriptRequestForm, Depends()],
+    form: YoutubeTranscriptRequestForm, # Passed as JSON body
+    user_id: CurrentUser,
     background_tasks: BackgroundTasks,
     session: SessionDep,
-) -> TranscriptRequestResponse:
+):
+    # Overwrite form user_id with the one from the JWT
+    form.user_id = user_id 
+    
     info = check_exist_and_create_transcription_entry(session, form)
+    
     if info.status == TranscriptStatus.InQueue.value:
         background_tasks.add_task(_bg_transcribe, form)
+        
     return TranscriptRequestResponse(transcript_id=info.id, success=True)
 
+# ── History (Authenticated) ───────────────────────────────────────────────────
 
-@router.get("/history/{user_id}")
+@router.get("/history", response_model=UserHistoryListResponse)
 async def get_transcription_history(
-    user_id : int,
-    offset: Optional[int],
-    limit : Optional[int]
-    ):
-    pass
+    user_id: CurrentUser,
+    session: SessionDep
+):
+    """Returns the authenticated user's transcription history."""
+    return get_user_history(session, user_id)
+
+@router.delete("/history")
+async def delete_history_entry(
+    req: RemoveHistoryRequest,
+    user_id: CurrentUser,
+    session: SessionDep
+):
+    """Removes an entry from history. Only if owned by user."""
+    success = remove_history_entry(session, req.history_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="History entry not found or unauthorized")
+    return {"success": True}

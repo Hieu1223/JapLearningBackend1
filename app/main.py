@@ -35,7 +35,8 @@ def ping():
 
 app.include_router(tokenization_router, prefix="/tokenization")
 app.include_router(security_router, tags=["Security"])
+app.include_router(user_management_router, tags=['User Management'])
 app.include_router(transcription_router, prefix="/transcription")
 app.include_router(youtube_router, prefix='/youtube')
-app.include_router(flashcard_router, prefix='/flashcard')
+app.include_router(flashcard_router, prefix='/flashcard', tags=["Flashcard"])
 app.include_router(manga_reader_router, prefix='/manga')
