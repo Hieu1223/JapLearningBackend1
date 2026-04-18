@@ -1,5 +1,7 @@
 
 from bs4 import BeautifulSoup,Tag
+import re
+
 
 def extract_data(card: Tag):
     try:
@@ -27,10 +29,20 @@ def extract_data_from_chapter_card(card):
     return {
         'num' : num,
         'title' : title,
-        'url' : link
+        'url' : link.replace('en','ja')
     }
 
 def extract_chapters(html):
     soup = BeautifulSoup(html)
     data = soup.find_all(name='li', class_ = 'item')
-    return [extract_data_from_chapter_card(item) for item in data]
+    text = soup.find('a', {'data-code' : 'JA'}).text
+    match = re.search(r"\((\d+)\s*Chapters\)", text)
+    number = int(match.group(1)) if match else None
+    match_text = f"{number}:"
+    chapter_list = [extract_data_from_chapter_card(item) for item in data]
+    result = []
+    for item in chapter_list:
+        result.append(item)
+        if match_text in item['title']:
+            break
+    return result
