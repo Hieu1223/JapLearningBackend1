@@ -71,3 +71,4 @@ beautifulsoup4
 requests
 PyJWT
 bcrypt
+numpy
