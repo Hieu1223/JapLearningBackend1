@@ -51,7 +51,7 @@ class MangafireExtractor:
         return response
 
     def crawl_search_page(self,query,page, search_vrf) -> list[MangaInfo]:
-        res = self.get(f"/filter?keyword={query}&page={page}&vrf={search_vrf}")
+        res = self.get(f"/filter?keyword={query}&page={page}&vrf={search_vrf}&language%5B%5D=ja")
         html =  res.text
         mangas = extract_from_page(html)
         return [MangaInfo(cover_url=thumbnail_url, manga_url=manga_url, name= title) for (manga_url, thumbnail_url, title,lastest_chapter) in mangas]
