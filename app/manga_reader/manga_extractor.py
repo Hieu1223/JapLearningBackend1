@@ -17,7 +17,7 @@ import requests
 from .crawler import extract_from_page,extract_chapters
 import asyncio
 import json
-
+from bs4 import BeautifulSoup
 BASE_URL = os.getenv("BASE_URL", "https://mangafire.to")
 
 
@@ -51,12 +51,46 @@ class MangafireExtractor:
         response.raise_for_status()
         return response
 
-    def crawl_search_page(self,query,page, search_vrf) -> list[MangaInfo]:
-        res = self.get(f"/filter?keyword={query}&page={page}&vrf={search_vrf}&language%5B%5D=ja")
-        html =  res.text
-        mangas = extract_from_page(html)
-        return [MangaInfo(cover_url=thumbnail_url, manga_url=manga_url, name= title) for (manga_url, thumbnail_url, title,lastest_chapter) in mangas]
+    def crawl_search_page(self, query, page, search_vrf) -> list[MangaInfo]:
+        # 1. Get the AJAX JSON response
+        res = self.get(f"/ajax/manga/search?keyword={query}&page={page}&vrf={search_vrf}")
+        
+        # 2. Extract the HTML string from the JSON wrapper
+        data = res.json()
+        html_str = data.get("result", {}).get("html", "")
+        
+        # 3. Parse the extracted HTML
+        soup = BeautifulSoup(html_str, "html.parser")
+        
+        # 4. Extract data from each 'unit' (replaces your extract_from_page logic)
+        mangas = []
+        for card in soup.find_all(class_="unit"):
+            try:
+                manga_url = card.get('href')
+                # Ensure absolute URL
+                if manga_url and not manga_url.startswith('http'):
+                    manga_url = self.base_url + manga_url
+                    
+                img_tag = card.find('img')
+                thumbnail_url = img_tag.get('src') if img_tag else ""
+                
+                # Title is in the h6 tag in this HTML version
+                title_tag = card.find('h6')
+                title = title_tag.text.strip() if title_tag else ""
+                
+                # Latest chapter is in the spans inside the info div
+                info_div = card.find(class_="info").find('div')
+                spans = info_div.find_all('span')
+                lastest_chapter = spans[-1].text.strip() if spans else ""
+                
+                mangas.append((manga_url, thumbnail_url, title, lastest_chapter))
+            except Exception as e:
+                continue
 
+        # 5. Return using your exact original interface
+        return [MangaInfo(cover_url=thumbnail_url, manga_url=manga_url, name=title) 
+            for (manga_url, thumbnail_url, title, lastest_chapter) in mangas]
+    
     async def search(self,query) -> list[MangaInfo]:
         query = query.lower()
         search_vrf = get_cached_search_vrf_token(self.session, query)
