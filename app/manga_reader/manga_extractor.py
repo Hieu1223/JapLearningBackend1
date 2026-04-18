@@ -34,9 +34,10 @@ class MangafireExtractor:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
             "Referer": "https://mangafire.to/"
         })
-        self.client.proxies.update({
-            "http": os.getenv("HTTP_PROXY")
-        })
+        #
+        #self.client.proxies.update({
+        #    "http": os.getenv("HTTP_PROXY")
+        #})
 
 
     def get(self,path: str, **kwargs):
@@ -70,8 +71,7 @@ class MangafireExtractor:
     
 
     async def get_chapter_list(self,manga_url):
-        html = self.get(manga_url).text
-        return extract_chapters(html)
+        return extract_chapters(manga_url)
 
 
 

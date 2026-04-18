@@ -1,7 +1,7 @@
 
 from bs4 import BeautifulSoup,Tag
 import re
-
+import requests
 
 def extract_data(card: Tag):
     try:
@@ -32,17 +32,41 @@ def extract_data_from_chapter_card(card):
         'url' : link.replace('en','ja')
     }
 
-def extract_chapters(html):
-    soup = BeautifulSoup(html)
-    data = soup.find_all(name='li', class_ = 'item')
-    text = soup.find('a', {'data-code' : 'JA'}).text
-    match = re.search(r"\((\d+)\s*Chapters\)", text)
-    number = int(match.group(1)) if match else None
-    match_text = f"{number}:"
-    chapter_list = [extract_data_from_chapter_card(item) for item in data]
-    result = []
-    for item in chapter_list:
-        result.append(item)
-        if match_text in item['title']:
-            break
-    return result
+def extract_chapters(manga_url, lang_code="ja"):
+    base_url = "https://mangafire.to"
+    
+    manga_id = manga_url.split('.')[-1].split('/')[0].split('#')[0]
+    print(manga_id)
+    is_volume = "#vol" in manga_url
+    request_type = "volume" if is_volume else "chapter"
+    
+    ajax_url = f"{base_url}/ajax/manga/{manga_id}/{request_type}/{lang_code}"
+    
+    headers = {
+        "Referer": f"{base_url}/",
+        "X-Requested-With": "XMLHttpRequest"
+    }
+    
+    response = requests.get(ajax_url, headers=headers)
+    print(response.text)
+    print(ajax_url)
+    response = response.json()
+    soup = BeautifulSoup(response.get("result", ""), "html.parser")
+    
+    selector = ".vol-list > .item" if is_volume else "li"
+    data = soup.select(selector)
+    
+    chapter_list = []
+    for item in data:
+        link = item.select_one("a")
+        if not link:
+            continue
+            
+        chapter_list.append({
+            "url": link.get("href"),
+            "num": item.get("data-number", "-1"),
+            "title": item.select_one("span").text.strip() if item.select_one("span") else ""
+        })
+    
+    chapter_list.reverse()
+    return chapter_list
