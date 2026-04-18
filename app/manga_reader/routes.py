@@ -58,6 +58,7 @@ async def get_ocr_data(
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
     try:
-        return await do_ocr(session,chapter_url)
+        data = await do_ocr(session,chapter_url)
+        return OCRResponse(pages=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
