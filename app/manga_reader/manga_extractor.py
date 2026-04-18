@@ -40,9 +40,9 @@ class MangafireExtractor:
         #})
 
 
-    def get(self,path: str, **kwargs):
+    def get(self,path: str):
         url = f"{BASE_URL}{path}"
-        response = self.client.get(url, **kwargs)
+        response = self.client.get(url)
         response.raise_for_status()
         return response
 
@@ -57,7 +57,7 @@ class MangafireExtractor:
         
         # 2. Extract the HTML string from the JSON wrapper
         data = res.json()
-        html_str = data.get("result", {}).get("html", "")
+        html_str = data.get("result").get("html", "")
         
         # 3. Parse the extracted HTML
         soup = BeautifulSoup(html_str, "html.parser")
@@ -68,8 +68,6 @@ class MangafireExtractor:
             try:
                 manga_url = card.get('href')
                 # Ensure absolute URL
-                if manga_url and not manga_url.startswith('http'):
-                    manga_url = self.base_url + manga_url
                     
                 img_tag = card.find('img')
                 thumbnail_url = img_tag.get('src') if img_tag else ""
@@ -85,6 +83,7 @@ class MangafireExtractor:
                 
                 mangas.append((manga_url, thumbnail_url, title, lastest_chapter))
             except Exception as e:
+                print(e)
                 continue
 
         # 5. Return using your exact original interface
