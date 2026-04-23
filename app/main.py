@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import FastAPI
 from .routes import *
 from .user_management import *
-from .database import create_db_and_tables,SessionDep
+from .database import create_db_and_tables,Session, engine
 
 app = FastAPI()
 app.add_middleware(
@@ -25,10 +25,11 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def on_startup(session: SessionDep):
+def on_startup():
     create_db_and_tables()
-    recover_orphaned_transcript(session)
-
+    
+    with Session(engine) as session:
+        recover_orphaned_transcript(session)
 
 @app.get("/ping")
 def ping():
