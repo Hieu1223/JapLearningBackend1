@@ -186,3 +186,12 @@ def remove_history_entry(session: Session, history_id: UUID, user_id: UUID) -> b
     session.delete(entry)
     session.commit()
     return True
+
+
+def get_orphaned_transcriptions(session: Session):
+    stmt = select(Transcript).where(
+        Transcript.status == TranscriptStatus.Transcripting.value,
+    )
+
+    results = session.exec(stmt).all()
+    return results
