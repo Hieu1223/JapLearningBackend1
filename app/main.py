@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import asyncio
 import sys
-
+from .transcription import recover_orphaned_transcript
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import FastAPI
 from .routes import *
 from .user_management import *
-from .database import create_db_and_tables
+from .database import create_db_and_tables,SessionDep
 
 app = FastAPI()
 app.add_middleware(
@@ -25,8 +25,9 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def on_startup():
+def on_startup(session: SessionDep):
     create_db_and_tables()
+    recover_orphaned_transcript(session)
 
 
 @app.get("/ping")

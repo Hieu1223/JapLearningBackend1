@@ -28,32 +28,61 @@ def create_transcription_history(session: Session, user_id: UUID, transcript_id:
     session.add(history_entry)
     session.commit()
 
-def _run(session: Session, form: YoutubeTranscriptRequestForm) -> TranscriptInfoResponse:
+
+
+def _transcribe_core(
+    session: Session,
+    info: TranscriptInfoResponse
+) -> TranscriptInfoResponse:
+    try:
+        update_status(session, info.id, TranscriptStatus.Transcripting.value)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = download_from_url(tmpdir, info.resource_url)
+
+            with open(file_path, "rb") as f:
+                audio_bytes = f.read()
+
+        data = transcribe(audio_bytes)
+
+        save_transcript(session, info.id, data)
+        update_status(session, info.id, TranscriptStatus.Finish.value)
+
+        return info
+
+    except Exception:
+        update_status(session, info.id, TranscriptStatus.Transcripting.value)
+        raise
+
+
+def transcribe_upload(
+    session: Session,
+    form: YoutubeTranscriptRequestForm
+) -> TranscriptInfoResponse:
+
     info = check_exist_and_create_transcription_entry(session, form)
+
     create_transcription_history(session, form.user_id, info.id)
-    update_status(session, info.id, TranscriptStatus.Transcripting.value)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = download_from_url(tmpdir, form.resource_url)
-
-        with open(file_path, "rb") as f:
-            audio_bytes = f.read()
-
-    data = transcribe(audio_bytes)
-    save_transcript(session, info.id, data)
-    update_status(session, info.id, TranscriptStatus.Finish.value)
-
-    return info
+    return _transcribe_core(session, info)
 
 
 
-def transcribe_upload(session: Session, form: YoutubeTranscriptRequestForm) -> TranscriptInfoResponse:
-    return _run(session, form)
 
-
-def recover_orphaned_transcript(session:Session):
+def recover_orphaned_transcript(session: Session):
     orphaned = get_orphaned_transcriptions(session)
-    for t in orphaned:
-        update_status(session, t.id, TranscriptStatus.InQueue.value)
 
-    return orphaned
+    results = []
+    for t in orphaned:
+        info = TranscriptInfoResponse(
+            id=t.id,
+            original_source=t.original_source,
+            thumnail_url=t.thumnail_url,
+            resource_url=t.resource_url,
+            resource_id=t.resource_id,
+            status=t.status,
+        )
+
+        results.append(_transcribe_core(session, info))
+
+    return results
