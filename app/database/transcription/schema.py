@@ -17,6 +17,7 @@ class TranscriptStatus(Enum):
     InQueue = 1
     Transcripting = 2
     Finish = 3
+    Error = 4
 
 
 class Transcript(SQLModel, table=True):

@@ -83,6 +83,17 @@ def recover_orphaned_transcript(session: Session):
             status=t.status,
         )
 
-        results.append(_transcribe_core(session, info))
+        try:
+            result = _transcribe_core(session, info)
+            results.append(result)
+
+        except Exception as e:
+            # 👇 mark as error
+            update_status(session, t.id, TranscriptStatus.Error.value)
+
+            # 👇 log it (replace with proper logger later)
+            print(f"[ERROR] Failed to recover transcript {t.id}: {e}")
+
+            continue
 
     return results
