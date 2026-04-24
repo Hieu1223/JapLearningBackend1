@@ -11,7 +11,14 @@ transcriber = Transcriber()
 
 def transcribe(audio_bytes: bytes) -> list:
     try:
-        result = transcriber.transcribe.remote.aio(audio_bytes)
+        result = transcriber.transcribe.remote(audio_bytes)
+    except Exception as e:
+        return e
+    return result
+
+def transcribe_url(url:str) -> list:
+    try:
+        result = transcriber.transcribe_url.remote(url)
     except Exception as e:
         return e
     return result

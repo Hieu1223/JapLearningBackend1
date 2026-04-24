@@ -6,7 +6,7 @@ from ..database import (
     get_orphaned_transcriptions
 )
 from .utils import download_from_url
-from .modal_transcribe import transcribe
+from .modal_transcribe import transcribe_url
 from ..database import (
     TranscriptStatus,
     TranscriptionHistory,
@@ -37,13 +37,7 @@ def _transcribe_core(
     try:
         update_status(session, info.id, TranscriptStatus.Transcripting.value)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            file_path = download_from_url(tmpdir, info.resource_url)
-
-            with open(file_path, "rb") as f:
-                audio_bytes = f.read()
-
-        data = transcribe(audio_bytes)
+        data = transcribe_url(info.resource_url)
 
         save_transcript(session, info.id, data)
         update_status(session, info.id, TranscriptStatus.Finish.value)
