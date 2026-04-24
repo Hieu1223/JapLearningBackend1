@@ -100,7 +100,7 @@ async def transcribe_from_site(
 async def get_transcription_history(
     user_id: CurrentUser,
     session: SessionDep
-):
+) -> UserHistoryListResponse:
     """Returns the authenticated user's transcription history."""
     return get_user_history(session, user_id)
 

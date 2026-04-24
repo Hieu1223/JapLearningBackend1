@@ -11,7 +11,7 @@ transcriber = Transcriber()
 
 def transcribe(audio_bytes: bytes) -> list:
     try:
-        result = transcriber.transcribe.remote(audio_bytes)
+        result = transcriber.transcribe.remote.aio(audio_bytes)
     except Exception as e:
         return e
     return result
