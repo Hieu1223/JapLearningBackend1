@@ -23,13 +23,13 @@
         }
       }
     },
-    "/tokenization/tokenize/{text}": {
+    "/tokenization/tokenize": {
       "get": {
         "tags": [
           "tokenization"
         ],
         "summary": "Tokenize Endpoint",
-        "operationId": "tokenize_endpoint_tokenization_tokenize__text__get",
+        "operationId": "tokenize_endpoint_tokenization_tokenize_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -38,9 +38,10 @@
         "parameters": [
           {
             "name": "text",
-            "in": "path",
+            "in": "query",
             "required": true,
             "schema": {
+              "type": "string",
               "title": "Text"
             }
           }
@@ -69,38 +70,113 @@
         }
       }
     },
-    "/": {
+    "/tokenization/kanji/{kanji}": {
       "get": {
         "tags": [
-          "Security",
-          "security"
+          "tokenization"
         ],
-        "summary": "Root",
-        "operationId": "root__get",
+        "summary": "Get Kanji",
+        "description": "Look up a single kanji character and return its data + all known words.",
+        "operationId": "get_kanji_tokenization_kanji__kanji__get",
+        "parameters": [
+          {
+            "name": "kanji",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kanji"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-
+                  "$ref": "#/components/schemas/KanjiResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
-        },
-        "security": [
+        }
+      }
+    },
+    "/tokenization/kanji": {
+      "get": {
+        "tags": [
+          "tokenization"
+        ],
+        "summary": "Search Kanji",
+        "description": "Search kanji by reading (Vietnamese romanization).",
+        "operationId": "search_kanji_tokenization_kanji_get",
+        "parameters": [
           {
-            "OAuth2PasswordBearer": []
+            "name": "reading",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Reading"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KanjiResponse"
+                  },
+                  "title": "Response Search Kanji Tokenization Kanji Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/token": {
       "post": {
         "tags": [
-          "Security",
-          "security"
+          "Security"
         ],
         "summary": "Login",
         "operationId": "login_token_post",
@@ -138,13 +214,81 @@
         }
       }
     },
+    "/check": {
+      "get": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Check Valid",
+        "operationId": "check_valid_check_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/register": {
+      "post": {
+        "tags": [
+          "User Management",
+          "User Management"
+        ],
+        "summary": "Register Route",
+        "description": "Register a new user and create their authentication credentials.",
+        "operationId": "register_route_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transcription/transcribe": {
       "get": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "List Public Transcripts",
-        "description": "Returns a paginated list of all public transcripts, newest first.",
         "operationId": "list_public_transcripts_transcription_transcribe_get",
         "parameters": [
           {
@@ -199,10 +343,9 @@
     "/transcription/transcribe/status": {
       "post": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "Batch Status",
-        "description": "Returns only the status for each transcript ID.",
         "operationId": "batch_status_transcription_transcribe_status_post",
         "requestBody": {
           "content": {
@@ -225,75 +368,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/TranscriptStatusResponse"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "type": "object",
-                  "title": "Response Batch Status Transcription Transcribe Status Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/transcription/transcribe/status/resource": {
-      "post": {
-        "tags": [
-          "transcription"
-        ],
-        "summary": "Batch Status By Resource",
-        "description": "Returns only the status for each {resource_id, original_source} pair.",
-        "operationId": "batch_status_by_resource_transcription_transcribe_status_resource_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "items": {
-                  "$ref": "#/components/schemas/ResourceQuery"
-                },
-                "type": "array",
-                "title": "Resources"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/TranscriptStatusResponse"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "type": "object",
-                  "title": "Response Batch Status By Resource Transcription Transcribe Status Resource Post"
+
                 }
               }
             }
@@ -314,10 +389,9 @@
     "/transcription/transcribe/{id}/info": {
       "get": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "Get Info",
-        "description": "Returns full transcript metadata by ID.",
         "operationId": "get_info_transcription_transcribe__id__info_get",
         "parameters": [
           {
@@ -363,73 +437,12 @@
         }
       }
     },
-    "/transcription/transcribe/resource/{original_source}/{resource_id}/info": {
-      "get": {
-        "tags": [
-          "transcription"
-        ],
-        "summary": "Get Info By Resource",
-        "description": "Returns full transcript metadata by resource_id and source site.",
-        "operationId": "get_info_by_resource_transcription_transcribe_resource__original_source___resource_id__info_get",
-        "parameters": [
-          {
-            "name": "resource_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Resource Id"
-            }
-          },
-          {
-            "name": "original_source",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Original Source"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/TranscriptInfoResponse"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Get Info By Resource Transcription Transcribe Resource  Original Source   Resource Id  Info Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/transcription/transcribe/{id}/data": {
       "get": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "Get Data",
-        "description": "Returns transcript result data by ID.",
         "operationId": "get_data_transcription_transcribe__id__data_get",
         "parameters": [
           {
@@ -475,141 +488,23 @@
         }
       }
     },
-    "/transcription/transcribe/resource/{original_source}/{resource_id}/data": {
-      "get": {
-        "tags": [
-          "transcription"
-        ],
-        "summary": "Get Data By Resource",
-        "description": "Returns transcript result data by resource_id and source site.",
-        "operationId": "get_data_by_resource_transcription_transcribe_resource__original_source___resource_id__data_get",
-        "parameters": [
-          {
-            "name": "resource_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Resource Id"
-            }
-          },
-          {
-            "name": "original_source",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Original Source"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/TranscriptResult"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Get Data By Resource Transcription Transcribe Resource  Original Source   Resource Id  Data Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/transcription/transcribe/youtube": {
       "post": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "Transcribe From Site",
         "operationId": "transcribe_from_site_transcription_transcribe_youtube_post",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeTranscriptRequestForm"
+              }
             }
           },
-          {
-            "name": "resource_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Resource Id"
-            }
-          },
-          {
-            "name": "original_source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "Youtube",
-              "title": "Original Source"
-            }
-          },
-          {
-            "name": "public",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": true,
-              "title": "Public"
-            }
-          },
-          {
-            "name": "thumbnail_url",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Thumbnail Url"
-            }
-          },
-          {
-            "name": "resource_url",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Resource Url"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Id"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -631,59 +526,57 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
-    "/transcription/history/{user_id}": {
+    "/transcription/history": {
       "get": {
         "tags": [
-          "transcription"
+          "Transcription"
         ],
         "summary": "Get Transcription History",
-        "operationId": "get_transcription_history_transcription_history__user_id__get",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "User Id"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
+        "description": "Returns the authenticated user's transcription history.",
+        "operationId": "get_transcription_history_transcription_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserHistoryListResponse"
                 }
-              ],
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Limit"
+              }
             }
           }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Transcription"
         ],
+        "summary": "Delete History Entry",
+        "description": "Removes an entry from history. Only if owned by user.",
+        "operationId": "delete_history_entry_transcription_history_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveHistoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -705,7 +598,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/youtube/search": {
@@ -810,47 +708,35 @@
         }
       }
     },
-    "/flashcard/decks": {
+    "/flashcard/words/search": {
       "get": {
-        "summary": "Get Decks",
-        "operationId": "get_decks_flashcard_decks_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Deck"
-                  },
-                  "type": "array",
-                  "title": "Response Get Decks Flashcard Decks Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/flashcard/cards/due": {
-      "get": {
-        "summary": "Get Due Cards",
-        "operationId": "get_due_cards_flashcard_cards_due_get",
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Search Words",
+        "description": "Full-text search across word, reading, and meaning.",
+        "operationId": "search_words_flashcard_words_search_get",
         "parameters": [
           {
-            "name": "deckId",
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Deckid"
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
             }
           }
         ],
@@ -862,9 +748,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Flashcard"
+                    "$ref": "#/components/schemas/WordResponse"
                   },
-                  "title": "Response Get Due Cards Flashcard Cards Due Get"
+                  "title": "Response Search Words Flashcard Words Search Get"
                 }
               }
             }
@@ -882,33 +768,53 @@
         }
       }
     },
-    "/flashcard/cards/review": {
+    "/flashcard/decks/public": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Browse Public Decks",
+        "operationId": "browse_public_decks_flashcard_decks_public_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicDeckResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Browse Public Decks Flashcard Decks Public Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks/{deck_id}/copy": {
       "post": {
-        "summary": "Review Card",
-        "operationId": "review_card_flashcard_cards_review_post",
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Copy Public Deck",
+        "description": "Deep-copy a public deck into the current user's account.\nEvery card is cloned with fresh SR state.",
+        "operationId": "copy_public_deck_flashcard_decks__deck_id__copy_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
-            "name": "cardId",
-            "in": "query",
+            "name": "deck_id",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Cardid"
-            }
-          },
-          {
-            "name": "rating",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "enum": [
-                "again",
-                "hard",
-                "good",
-                "easy"
-              ],
-              "type": "string",
-              "title": "Rating"
+              "format": "uuid",
+              "title": "Deck Id"
             }
           }
         ],
@@ -918,7 +824,285 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Flashcard"
+                  "$ref": "#/components/schemas/DeckWithStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Read Decks",
+        "operationId": "read_decks_flashcard_decks_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeckWithStatsResponse"
+                  },
+                  "title": "Response Read Decks Flashcard Decks Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Create Deck",
+        "operationId": "create_deck_flashcard_decks_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Public"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckWithStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks/{deck_id}": {
+      "patch": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Update Deck",
+        "operationId": "update_deck_flashcard_decks__deck_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Delete Deck",
+        "operationId": "delete_deck_flashcard_decks__deck_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks/{deck_id}/progress": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Get Deck Progress",
+        "operationId": "get_deck_progress_flashcard_decks__deck_id__progress_get",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckProgressResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks/{deck_id}/cards": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Get Cards In Deck",
+        "operationId": "get_cards_in_deck_flashcard_decks__deck_id__cards_get",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CardResponse"
+                  },
+                  "title": "Response Get Cards In Deck Flashcard Decks  Deck Id  Cards Get"
                 }
               }
             }
@@ -938,7 +1122,11 @@
     },
     "/flashcard/cards": {
       "post": {
+        "tags": [
+          "Flashcard"
+        ],
         "summary": "Add Card",
+        "description": "Add a word (by word_id) to one of the user's decks.",
         "operationId": "add_card_flashcard_cards_post",
         "requestBody": {
           "content": {
@@ -956,7 +1144,60 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Flashcard"
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/flashcard/cards/{card_id}": {
+      "delete": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Delete Card",
+        "operationId": "delete_card_flashcard_cards__card_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Card Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
                 }
               }
             }
@@ -972,6 +1213,232 @@
             }
           }
         }
+      }
+    },
+    "/flashcard/cards/{card_id}/reset": {
+      "post": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Reset Card",
+        "description": "Reset a card's SRS progress back to New state.",
+        "operationId": "reset_card_flashcard_cards__card_id__reset_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Card Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/decks/{deck_id}/next": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Read Next Card",
+        "description": "Fetch the next due card for a deck.\nReturns null when there is nothing left to study.",
+        "operationId": "read_next_card_flashcard_decks__deck_id__next_get",
+        "parameters": [
+          {
+            "name": "deck_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deck Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CardResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Read Next Card Flashcard Decks  Deck Id  Next Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/cards/review": {
+      "post": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Review Card",
+        "description": "Submit a review rating (again/hard/good/easy).",
+        "operationId": "review_card_flashcard_cards_review_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/flashcard/stats/daily": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Get Daily Stats",
+        "operationId": "get_daily_stats_flashcard_stats_daily_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyStatResponse"
+                  },
+                  "title": "Response Get Daily Stats Flashcard Stats Daily Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flashcard/stats/overview": {
+      "get": {
+        "tags": [
+          "Flashcard"
+        ],
+        "summary": "Get Overview Stats",
+        "operationId": "get_overview_stats_flashcard_stats_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewStatsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/manga/search": {
@@ -1005,7 +1472,11 @@
             "content": {
               "application/json": {
                 "schema": {
-
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaInfo"
+                  },
+                  "title": "Response Search Manga Manga Search Get"
                 }
               }
             }
@@ -1047,7 +1518,11 @@
             "content": {
               "application/json": {
                 "schema": {
-
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChapterInfo"
+                  },
+                  "title": "Response Get Chapter List Manga Chapter List Get"
                 }
               }
             }
@@ -1089,7 +1564,11 @@
             "content": {
               "application/json": {
                 "schema": {
-
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Images Manga Read Get"
                 }
               }
             }
@@ -1131,7 +1610,7 @@
             "content": {
               "application/json": {
                 "schema": {
-
+                  "$ref": "#/components/schemas/OCRResponse"
                 }
               }
             }
@@ -1154,19 +1633,21 @@
     "schemas": {
       "AddCardRequest": {
         "properties": {
-          "word": {
+          "deck_id": {
             "type": "string",
-            "title": "Word"
+            "format": "uuid",
+            "title": "Deck Id"
           },
-          "meaning": {
+          "word_id": {
             "type": "string",
-            "title": "Meaning"
+            "format": "uuid",
+            "title": "Word Id"
           }
         },
         "type": "object",
         "required": [
-          "word",
-          "meaning"
+          "deck_id",
+          "word_id"
         ],
         "title": "AddCardRequest"
       },
@@ -1228,6 +1709,95 @@
           "password"
         ],
         "title": "Body_login_token_post"
+      },
+      "CardResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "deck_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Deck Id"
+          },
+          "word": {
+            "$ref": "#/components/schemas/WordResponse"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CardState"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "stability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stability"
+          },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
+          "due": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due"
+          },
+          "last_review": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "deck_id",
+          "word",
+          "state",
+          "due"
+        ],
+        "title": "CardResponse"
+      },
+      "CardState": {
+        "type": "string",
+        "enum": [
+          "new",
+          "learning",
+          "review",
+          "relearning"
+        ],
+        "title": "CardState"
       },
       "ChannelInfo": {
         "properties": {
@@ -1339,97 +1909,194 @@
         ],
         "title": "ChannelPreview"
       },
-      "Deck": {
+      "ChapterInfo": {
+        "properties": {
+          "num": {
+            "type": "string",
+            "title": "Num"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num",
+          "title",
+          "url"
+        ],
+        "title": "ChapterInfo"
+      },
+      "DailyStatResponse": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "correct": {
+            "type": "integer",
+            "title": "Correct"
+          },
+          "wrong": {
+            "type": "integer",
+            "title": "Wrong"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "total",
+          "correct",
+          "wrong",
+          "accuracy"
+        ],
+        "title": "DailyStatResponse"
+      },
+      "DeckProgressResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "new": {
+            "type": "integer",
+            "title": "New"
+          },
+          "learning": {
+            "type": "integer",
+            "title": "Learning"
+          },
+          "review": {
+            "type": "integer",
+            "title": "Review"
+          },
+          "relearning": {
+            "type": "integer",
+            "title": "Relearning"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "new",
+          "learning",
+          "review",
+          "relearning",
+          "due"
+        ],
+        "title": "DeckProgressResponse"
+      },
+      "DeckResponse": {
         "properties": {
           "id": {
             "type": "string",
+            "format": "uuid",
             "title": "Id"
           },
           "name": {
             "type": "string",
             "title": "Name"
           },
-          "cardCount": {
-            "type": "integer",
-            "title": "Cardcount"
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "public": {
+            "type": "boolean",
+            "title": "Public"
           }
         },
         "type": "object",
         "required": [
           "id",
           "name",
-          "cardCount"
+          "owner_id",
+          "public"
         ],
-        "title": "Deck"
+        "title": "DeckResponse"
       },
-      "Flashcard": {
+      "DeckStatsResponse": {
+        "properties": {
+          "new": {
+            "type": "integer",
+            "title": "New",
+            "default": 0
+          },
+          "learning": {
+            "type": "integer",
+            "title": "Learning",
+            "default": 0
+          },
+          "review": {
+            "type": "integer",
+            "title": "Review",
+            "default": 0
+          },
+          "relearning": {
+            "type": "integer",
+            "title": "Relearning",
+            "default": 0
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "DeckStatsResponse"
+      },
+      "DeckWithStatsResponse": {
         "properties": {
           "id": {
             "type": "string",
+            "format": "uuid",
             "title": "Id"
           },
-          "front": {
+          "name": {
             "type": "string",
-            "title": "Front"
+            "title": "Name"
           },
-          "back": {
+          "owner_id": {
             "type": "string",
-            "title": "Back"
+            "format": "uuid",
+            "title": "Owner Id"
           },
-          "reading": {
-            "type": "string",
-            "title": "Reading"
+          "public": {
+            "type": "boolean",
+            "title": "Public"
           },
-          "partOfSpeech": {
-            "type": "string",
-            "title": "Partofspeech"
-          },
-          "deckId": {
-            "type": "string",
-            "title": "Deckid"
-          },
-          "interval": {
-            "type": "integer",
-            "title": "Interval"
-          },
-          "easeFactor": {
-            "type": "number",
-            "title": "Easefactor"
-          },
-          "repetitions": {
-            "type": "integer",
-            "title": "Repetitions"
-          },
-          "nextReview": {
-            "type": "string",
-            "title": "Nextreview"
-          },
-          "lastReview": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lastreview"
+          "stats": {
+            "$ref": "#/components/schemas/DeckStatsResponse"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "front",
-          "back",
-          "reading",
-          "partOfSpeech",
-          "deckId",
-          "interval",
-          "easeFactor",
-          "repetitions",
-          "nextReview"
+          "name",
+          "owner_id",
+          "public",
+          "stats"
         ],
-        "title": "Flashcard"
+        "title": "DeckWithStatsResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1444,29 +2111,435 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ResourceQuery": {
+      "KanjiResponse": {
         "properties": {
-          "resource_id": {
+          "id": {
             "type": "string",
-            "title": "Resource Id"
+            "format": "uuid",
+            "title": "Id"
           },
-          "original_source": {
+          "kanji": {
             "type": "string",
-            "title": "Original Source"
+            "title": "Kanji"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          },
+          "strokes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strokes"
+          },
+          "radical": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radical"
+          },
+          "unicode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unicode"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape"
+          },
+          "meanings": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meanings"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/WordResponse"
+            },
+            "type": "array",
+            "title": "Words",
+            "default": []
           }
         },
         "type": "object",
         "required": [
-          "resource_id",
-          "original_source"
+          "id",
+          "kanji"
         ],
-        "title": "ResourceQuery"
+        "title": "KanjiResponse"
+      },
+      "MangaInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "cover_url": {
+            "type": "string",
+            "title": "Cover Url"
+          },
+          "manga_url": {
+            "type": "string",
+            "title": "Manga Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "cover_url",
+          "manga_url"
+        ],
+        "title": "MangaInfo"
+      },
+      "OCRBlock": {
+        "properties": {
+          "box": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Box"
+          },
+          "vertical": {
+            "type": "boolean",
+            "title": "Vertical"
+          },
+          "font_size": {
+            "type": "number",
+            "title": "Font Size"
+          },
+          "lines_coords": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Lines Coords"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "box",
+          "vertical",
+          "font_size",
+          "lines_coords",
+          "lines"
+        ],
+        "title": "OCRBlock"
+      },
+      "OCRPage": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "img_width": {
+            "type": "integer",
+            "title": "Img Width"
+          },
+          "img_height": {
+            "type": "integer",
+            "title": "Img Height"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/OCRBlock"
+            },
+            "type": "array",
+            "title": "Blocks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "img_width",
+          "img_height",
+          "blocks"
+        ],
+        "title": "OCRPage"
+      },
+      "OCRResponse": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/OCRPage"
+            },
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pages"
+        ],
+        "title": "OCRResponse"
+      },
+      "OverviewStatsResponse": {
+        "properties": {
+          "total_decks": {
+            "type": "integer",
+            "title": "Total Decks"
+          },
+          "total_cards": {
+            "type": "integer",
+            "title": "Total Cards"
+          },
+          "due_cards": {
+            "type": "integer",
+            "title": "Due Cards"
+          },
+          "new_cards": {
+            "type": "integer",
+            "title": "New Cards"
+          },
+          "reviews_today": {
+            "type": "integer",
+            "title": "Reviews Today"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          },
+          "streak_days": {
+            "type": "integer",
+            "title": "Streak Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_decks",
+          "total_cards",
+          "due_cards",
+          "new_cards",
+          "reviews_today",
+          "accuracy",
+          "streak_days"
+        ],
+        "title": "OverviewStatsResponse"
+      },
+      "PublicDeckResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "card_count": {
+            "type": "integer",
+            "title": "Card Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "owner_id",
+          "card_count"
+        ],
+        "title": "PublicDeckResponse"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "RemoveHistoryRequest": {
+        "properties": {
+          "history_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "History Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "history_id"
+        ],
+        "title": "RemoveHistoryRequest"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Card Id"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "again",
+              "hard",
+              "good",
+              "easy"
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card_id",
+          "rating"
+        ],
+        "title": "ReviewRequest"
+      },
+      "Token": {
+        "properties": {
+          "sentence_id": {
+            "type": "integer",
+            "title": "Sentence Id"
+          },
+          "surface": {
+            "type": "string",
+            "title": "Surface"
+          },
+          "normalized": {
+            "type": "string",
+            "title": "Normalized"
+          },
+          "dictionary_form": {
+            "type": "string",
+            "title": "Dictionary Form"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          },
+          "pos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pos"
+          },
+          "word_id": {
+            "type": "integer",
+            "title": "Word Id"
+          },
+          "begin": {
+            "type": "integer",
+            "title": "Begin"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WordEntry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "sentence_id",
+          "surface",
+          "normalized",
+          "dictionary_form",
+          "pos",
+          "word_id",
+          "begin",
+          "end"
+        ],
+        "title": "Token"
       },
       "TokenList": {
         "properties": {
           "tokens": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Token"
             },
             "type": "array",
             "title": "Tokens"
@@ -1617,23 +2690,104 @@
         ],
         "title": "TranscriptSegment"
       },
-      "TranscriptStatusResponse": {
+      "User": {
         "properties": {
-          "done": {
-            "type": "boolean",
-            "title": "Done"
-          },
-          "msg": {
+          "id": {
             "type": "string",
-            "title": "Msg"
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "title": "User"
+      },
+      "UserHistoryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserHistoryResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
           }
         },
         "type": "object",
         "required": [
-          "done",
-          "msg"
+          "items",
+          "total"
         ],
-        "title": "TranscriptStatusResponse"
+        "title": "UserHistoryListResponse"
+      },
+      "UserHistoryResponse": {
+        "properties": {
+          "history_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "History Id"
+          },
+          "transcript_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Transcript Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "title": "Thumbnail Url"
+          },
+          "original_source": {
+            "type": "string",
+            "title": "Original Source"
+          },
+          "date_created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date Created"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "history_id",
+          "transcript_id",
+          "name",
+          "thumbnail_url",
+          "original_source",
+          "date_created",
+          "status"
+        ],
+        "title": "UserHistoryResponse"
       },
       "ValidationError": {
         "properties": {
@@ -1804,6 +2958,114 @@
           "description"
         ],
         "title": "VideoPreview"
+      },
+      "WordEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "word": {
+            "type": "string",
+            "title": "Word"
+          },
+          "reading": {
+            "type": "string",
+            "title": "Reading"
+          },
+          "meaning": {
+            "type": "string",
+            "title": "Meaning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "word",
+          "reading",
+          "meaning"
+        ],
+        "title": "WordEntry"
+      },
+      "WordResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "word": {
+            "type": "string",
+            "title": "Word"
+          },
+          "reading": {
+            "type": "string",
+            "title": "Reading"
+          },
+          "meaning": {
+            "type": "string",
+            "title": "Meaning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "word",
+          "reading",
+          "meaning"
+        ],
+        "title": "WordResponse"
+      },
+      "YoutubeTranscriptRequestForm": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "original_source": {
+            "type": "string",
+            "title": "Original Source",
+            "default": "Youtube"
+          },
+          "public": {
+            "type": "boolean",
+            "title": "Public",
+            "default": true
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "title": "Thumbnail Url"
+          },
+          "resource_url": {
+            "type": "string",
+            "title": "Resource Url"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "thumbnail_url",
+          "resource_url",
+          "user_id"
+        ],
+        "title": "YoutubeTranscriptRequestForm"
       }
     },
     "securitySchemes": {

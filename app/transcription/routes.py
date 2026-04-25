@@ -85,9 +85,7 @@ async def transcribe_from_site(
     session: SessionDep,
 ):
     # Overwrite form user_id with the one from the JWT
-    form.user_id = user_id 
-    
-    info = check_exist_and_create_transcription_entry(session, form)
+    info = check_exist_and_create_transcription_entry(session, form,user_id)
     
     if info.status == TranscriptStatus.InQueue.value:
         background_tasks.add_task(_bg_transcribe, form)

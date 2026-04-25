@@ -93,7 +93,7 @@ def claim_next_queued(session: Session) -> Transcript | None:
 
 
 def check_exist_and_create_transcription_entry(
-    session: Session, form: YoutubeTranscriptRequestForm
+    session: Session, form: YoutubeTranscriptRequestForm,user_id: UUID
 ) -> TranscriptInfoResponse:
     """
     Idempotent: if resource exists, link to user history if not already linked.
@@ -122,7 +122,7 @@ def check_exist_and_create_transcription_entry(
     # 3. Check if this specific user already has this in their history
     history_exists = session.exec(
         select(TranscriptionHistory).where(
-            TranscriptionHistory.user_id == form.user_id,
+            TranscriptionHistory.user_id == user_id,
             TranscriptionHistory.transcript_id == transcript.id
         )
     ).first()
@@ -130,7 +130,7 @@ def check_exist_and_create_transcription_entry(
     # 4. If not in history, add it (Auto-link on request)
     if not history_exists:
         history_entry = TranscriptionHistory(
-            user_id=form.user_id,
+            user_id=user_id,
             transcript_id=transcript.id
         )
         session.add(history_entry)

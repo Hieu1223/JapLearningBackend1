@@ -55,7 +55,6 @@ class YoutubeTranscriptRequestForm(BaseModel):
     public: bool = True
     thumbnail_url : str
     resource_url : str
-    user_id: UUID
     
 
 
