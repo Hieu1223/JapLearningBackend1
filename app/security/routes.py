@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from .auth import hash_password, verify_password, create_token
 from ..database import SessionDep
 from ..database.security.queries import get_auth_user_by_username
+from .auth import CurrentUser
 
 router = APIRouter()
 
@@ -17,3 +18,7 @@ def login(session: SessionDep, form: OAuth2PasswordRequestForm = Depends()):
     # Generate token using the linked Profile user_id
     token = create_token(auth_entry.user_id)
     return {"access_token": token, "token_type": "bearer"}
+
+@router.get('/check')
+def check_valid(user : CurrentUser):
+    return {'logged_in' : True}

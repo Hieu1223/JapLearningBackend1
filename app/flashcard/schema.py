@@ -7,7 +7,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import Optional, Literal
 from enum import Enum
-
+from ..tokenization.schema import WordResponse
 from ..database.flashcard.schema import State
 
 
@@ -46,19 +46,6 @@ class AddCardRequest(BaseModel):
 class ReviewRequest(BaseModel):
     card_id: UUID
     rating:  Literal["again", "hard", "good", "easy"]
-
-
-# =========================================================
-# WORD / DICTIONARY
-# =========================================================
-
-class WordResponse(BaseModel):
-    id:      UUID
-    word:    str
-    reading: str
-    meaning: str
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 # =========================================================
