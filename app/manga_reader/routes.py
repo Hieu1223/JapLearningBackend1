@@ -21,7 +21,7 @@ async def search_manga(
     try:
         # 1. Try NatsuID (Rawkuma) first
         natsu = NatsuExtractor(session)
-        results = await natsu.search(query)
+        results = natsu.search(query)
         
         # 2. If no results found, fallback to Mangafire
         if not results:
@@ -49,7 +49,7 @@ async def get_chapter_list(
         # NatsuID uses the full Base URL (e.g., rawkuma.net)
         natsu = NatsuExtractor(session)
         if natsu.base_url in manga_url:
-            return await natsu.get_chapter_list(manga_url)
+            return natsu.get_chapter_list(manga_url)
         else:
             return await MangafireExtractor(session).get_chapter_list(manga_url)
     except Exception as e:
@@ -68,7 +68,7 @@ async def get_images(
         # Determine extractor based on URL
         natsu = NatsuExtractor(session)
         if natsu.base_url in chapter_url:
-            return await natsu.get_page_images(chapter_url)
+            return natsu.get_page_images(chapter_url)
         else:
             # Note: Your MangafireExtractor uses 'get_chapter_images' 
             return await MangafireExtractor(session).get_chapter_images(chapter_url)

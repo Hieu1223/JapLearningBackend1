@@ -84,7 +84,7 @@ class NatsuExtractor:
             })
         return chapters
 
-    def get_chapter_images(self, chapter_url: str) -> List[str]:
+    def get_page_images(self, chapter_url: str) -> List[str]:
         """Logic from Kotlin: pageListParse()"""
         res = self.client.get(chapter_url)
         soup = BeautifulSoup(res.text, "html.parser")
@@ -101,16 +101,13 @@ class NatsuExtractor:
 
         # Remove duplicates while preserving order
         images = list(dict.fromkeys(images))
-
-        # DB Creation (The only persistence logic retained)
-        if False:
-            new_chapter = Chapter(
+        new_chapter = Chapter(
                 link=chapter_url,
                 image_list=json.dumps(images)
-            )
-            self.db.add(new_chapter)
-            self.db.commit()
-            self.db.refresh(new_chapter)
+        )
+        self.db.add(new_chapter)
+        self.db.commit()
+        self.db.refresh(new_chapter)
             
         return images
     def search(self, query: str, page: int = 1) -> List[MangaInfo]:
