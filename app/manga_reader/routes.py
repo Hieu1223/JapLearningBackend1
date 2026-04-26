@@ -15,8 +15,8 @@ from ..security.auth import CurrentUser
 router = APIRouter(tags=['Manga'])
 @router.get("/search")
 async def search_manga(
-    session: SessionDep,
-    query: Optional[str],
+    session: SessionDep, 
+    query: Optional[str] = "%20",
     page: int = Query(1, ge=1),
     sort: SortType = Query("recently_updated")
 ) -> list[MangaInfo]:

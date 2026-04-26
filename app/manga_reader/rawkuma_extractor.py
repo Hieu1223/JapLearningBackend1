@@ -82,7 +82,7 @@ class NatsuExtractor:
         soup = BeautifulSoup(res.text, "html.parser")
         
         chapters = []
-        for i, row in enumerate(soup.select("div a:has(time)")):
+        for i, row in enumerate(reversed(soup.select("div a:has(time)"))):
             chapters.append({
                 'num': f'{i}',
                 "title": row.select_one("span").text.strip() if row.select_one("span") else "Chapter",
