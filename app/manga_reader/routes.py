@@ -6,10 +6,11 @@ from ..database import SessionDep
 from .rawkuma_extractor import NatsuExtractor
 from .manga_extractor import MangafireExtractor
 from .manga_ocr import do_ocr
-from .schema import MangaInfo, ChapterInfo, OCRResponse
+from .schema import MangaInfo, ChapterInfo, OCRResponse,ReadHistoryResponse,ReadHistoryUpdate
 from .sort_type import SortType
 from fastapi import Query
-
+from ..database.manga_reader.queries import upsert_read_history_query,get_read_histories
+from ..security.auth import CurrentUser
 
 router = APIRouter(tags=['Manga'])
 @router.get("/search")
@@ -91,6 +92,31 @@ async def get_images(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/history/upsert", response_model=ReadHistoryResponse)
+async def update_history(
+    data: ReadHistoryUpdate, 
+    session: SessionDep,
+    user_id: CurrentUser
+):
+    try:
+        # The route unpacks the schema into the flattened query function
+        updated_history = upsert_read_history_query(
+            session=session,
+            user_id=user_id,
+            manga_url=data.manga_url,
+            current_chapter_url=data.current_chapter_url,
+            current_chapter_name=data.current_chapter_name
+        )
+        return updated_history
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/history/{user_id}", response_model=list[ReadHistoryResponse])
+async def read_user_history(user_id: CurrentUser, session: SessionDep):
+    history = get_read_histories(session, user_id)
+    return history
+
 @router.get('/ocr_data')
 async def get_ocr_data(
     session: SessionDep,
@@ -104,3 +130,4 @@ async def get_ocr_data(
         return OCRResponse(pages=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    

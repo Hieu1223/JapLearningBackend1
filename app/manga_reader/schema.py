@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 
 class MangaInfo(BaseModel):
     name : str
@@ -34,3 +35,21 @@ class OCRPage(BaseModel):
 # The final output is usually a list of pages
 class OCRResponse(BaseModel):
     pages: List[OCRPage]
+
+
+
+class ReadHistoryUpdate(BaseModel):
+    manga_url: str
+    current_chapter_url: str
+    current_chapter_name: Optional[str] = None
+
+class ReadHistoryResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    manga_url: str
+    current_chapter_url: str
+    current_chapter_name: Optional[str] = None
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

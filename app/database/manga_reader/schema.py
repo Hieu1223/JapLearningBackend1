@@ -21,9 +21,20 @@ class Chapter(SQLModel, table = True):
     ocr_data : str = Field(default="")
     image_list : str = Field(default="{}")
 
+from datetime import datetime , timezone
 
-class ReadHistory(SQLModel, table = True):
-    id : UUID = Field(primary_key=True, default_factory=uuid4)
-    user_id : UUID = Field(foreign_key="user.id")
-    manga_id : UUID = Field(foreign_key="manga.id")
+class ReadHistory(SQLModel, table=True):
+    id: UUID = Field(primary_key=True, default_factory=uuid4)
+    user_id: UUID = Field(foreign_key="user.id", index=True)
+    
+    # Store manga details directly
+    manga_url: str = Field(index=True) 
+    
+    current_chapter_url: str = Field(description="URL of the last chapter opened")
+    current_chapter_name: Optional[str] = Field(default=None, description="e.g., 'Chapter 10'")
+    
+    read_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    

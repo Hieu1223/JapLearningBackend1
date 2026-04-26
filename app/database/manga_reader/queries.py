@@ -2,7 +2,7 @@ import json
 from sqlmodel import Session, select, col
 from uuid import UUID
 from .schema import Manga, Chapter, QueryVRFToken, ReadHistory
-
+from datetime import datetime, timezone
 # ── Search & VRF Cache ────────────────────────────────────────────────────────
 
 def get_cached_search_vrf_token(session: Session, query: str) -> str | None:
@@ -100,12 +100,48 @@ def update_chapter_ocr(session: Session, chapter_id: UUID, ocr_data: str):
     return chapter
 
 # ── History ───────────────────────────────────────────────────────────────────
-
-def get_read_histories(session: Session, user_id: UUID) -> list[Manga]:
-    """Returns a list of Manga objects found in the user's read history."""
+def get_read_histories(session: Session, user_id: UUID) -> list[ReadHistory]:
+    """
+    Returns a list of history records for the user, 
+    sorted by the most recently updated.
+    """
     statement = (
-        select(Manga)
-        .join(ReadHistory, ReadHistory.manga_id == Manga.id)
+        select(ReadHistory)
         .where(ReadHistory.user_id == user_id)
+        .order_by(ReadHistory.updated_at.desc())
     )
     return list(session.exec(statement).all())
+
+
+def upsert_read_history_query(
+    session: Session, 
+    user_id: UUID,
+    manga_url: str,
+    current_chapter_url: str,
+    current_chapter_name: str = None
+) -> ReadHistory:
+    # 1. Search for existing entry
+    statement = select(ReadHistory).where(
+        ReadHistory.user_id == user_id,
+        ReadHistory.manga_url == manga_url
+    )
+    history_item = session.exec(statement).first()
+
+    if history_item:
+        # 2. Update existing fields
+        history_item.current_chapter_url = current_chapter_url
+        history_item.current_chapter_name = current_chapter_name
+        history_item.updated_at = datetime.now(timezone.utc)
+    else:
+        # 3. Create new record
+        history_item = ReadHistory(
+            user_id=user_id,
+            manga_url=manga_url,
+            current_chapter_url=current_chapter_url,
+            current_chapter_name=current_chapter_name
+        )
+        session.add(history_item)
+
+    session.commit()
+    session.refresh(history_item)
+    return history_item
