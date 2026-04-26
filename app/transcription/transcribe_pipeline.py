@@ -51,12 +51,13 @@ def _transcribe_core(
 
 def transcribe_upload(
     session: Session,
-    form: YoutubeTranscriptRequestForm
+    form: YoutubeTranscriptRequestForm,
+    user_id: UUID
 ) -> TranscriptInfoResponse:
 
-    info = check_exist_and_create_transcription_entry(session, form)
+    info = check_exist_and_create_transcription_entry(session, form,user_id)
 
-    create_transcription_history(session, form.user_id, info.id)
+    create_transcription_history(session, user_id, info.id)
 
     return _transcribe_core(session, info)
 

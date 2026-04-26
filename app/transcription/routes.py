@@ -72,10 +72,10 @@ async def get_data(id: UUID, session: SessionDep):
 
 # ── Submit jobs (Authenticated) ───────────────────────────────────────────────
 
-def _bg_transcribe(form: YoutubeTranscriptRequestForm):
+def _bg_transcribe(form: YoutubeTranscriptRequestForm,user_id : UUID):
     from sqlmodel import Session
     with Session(engine) as session:
-        transcribe_upload(session, form)
+        transcribe_upload(session, form,user_id)
 
 @router.post("/transcribe/youtube", response_model=TranscriptRequestResponse)
 async def transcribe_from_site(
@@ -88,7 +88,7 @@ async def transcribe_from_site(
     info = check_exist_and_create_transcription_entry(session, form,user_id)
     
     if info.status == TranscriptStatus.InQueue.value:
-        background_tasks.add_task(_bg_transcribe, form)
+        background_tasks.add_task(_bg_transcribe, form,user_id)
         
     return TranscriptRequestResponse(transcript_id=info.id, success=True)
 
