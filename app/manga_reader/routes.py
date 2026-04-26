@@ -7,39 +7,54 @@ from .rawkuma_extractor import NatsuExtractor
 from .manga_extractor import MangafireExtractor
 from .manga_ocr import do_ocr
 from .schema import MangaInfo, ChapterInfo, OCRResponse
+from .sort_type import SortType
+from fastapi import Query
+
 
 router = APIRouter(tags=['Manga'])
-
 @router.get("/search")
 async def search_manga(
     session: SessionDep,
     query: Optional[str],
+    page: int = Query(1, ge=1),
+    sort: SortType = Query("recently_updated")
 ) -> list[MangaInfo]:
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
+    # Normalize query for consistent caching/searching
+    query_clean = query.strip()
+
     try:
-        # 1. Try NatsuID (Rawkuma) first
+        # 1. Primary Source: NatsuID (Rawkuma)
+        # Internal logic now forces 'type[]=manga' for Japanese content
         natsu = NatsuExtractor(session)
-        results = natsu.search(query)
+        results = natsu.search(query=query_clean, page=page, sort=sort)
         
-        # 2. If no results found, fallback to Mangafire
+        # 2. Fallback: Mangafire
+        # Triggered if Natsu returns no results or if page 1 is empty
         if not results:
-            return await MangafireExtractor(session).search(query)
+            mf = MangafireExtractor(session)
+            return await mf.search(query=query_clean, page=page, sort=sort)
             
         return results
-    except Exception as e:
-        # If Natsu fails entirely, try Mangafire as a last resort before erroring
-        try:
-            return await MangafireExtractor(session).search(query)
-        except:
-            raise HTTPException(status_code=500, detail=str(e))
 
+    except Exception as e:
+        # If Natsu logic crashes (e.g., Nonce retrieval fails), 
+        # attempt Mangafire as the final fallback.
+        try:
+            mf = MangafireExtractor(session)
+            return await mf.search(query=query_clean, page=page, sort=sort)
+        except Exception as inner_e:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Both sources failed. Original error: {str(e)} | Fallback error: {str(inner_e)}"
+            )
 
 @router.get('/chapter_list')
 async def get_chapter_list(
     session: SessionDep,
-    manga_url: str
+    manga_url: str,
 ) -> list[ChapterInfo]:
     if not manga_url:
         raise HTTPException(status_code=400, detail="manga_url is required")
