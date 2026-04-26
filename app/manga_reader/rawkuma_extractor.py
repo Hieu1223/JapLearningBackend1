@@ -12,10 +12,15 @@ class NatsuExtractor:
         self.db = db_session
         self.base_url = os.getenv("BASE_URL", "https://rawkuma.net").rstrip("/")
         self.client = requests.Session()
+        proxy_url = os.getenv("HTTP_PROXY")
+        self.client.proxies = {
+            "http": proxy_url,
+        }
         self.client.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36",
             "Referer": f"{self.base_url}/",
         })
+        
 
     def get_manga_id(self, manga_url: str) -> str:
         """
