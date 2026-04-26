@@ -110,34 +110,35 @@ class NatsuExtractor:
         self.db.refresh(new_chapter)
             
         return images
-    def search(self, query: str, page: int = 1, sort: str = "recently_updated") -> List[MangaInfo]:
-        """Performs search using a simple string-based sort mapping."""
+    def search(self, query: str, page: int = 1,sort="") -> List[MangaInfo]:
+        """Performs a POST search using the NatsuId multipart strategy."""
         api_url = f"{self.base_url}/wp-admin/admin-ajax.php?action=advanced_search"
-        
-        # Simple string mapping
         sort_map = {
-            "recently_updated": "latest",
+            "recently_updated": "updated",
             "most_viewed": "popular",
             "scores": "rating",
-            "title_az": "alphabet"
+            "title_az": "title"
         }
-        orderby = sort_map.get(sort, "latest")
-
+        # Constructing the form data payload mimicking the Kotlin MultipartBody
         payload = {
             "nonce": self._get_nonce(),
             "page": str(page),
             "query": query,
             "order": "desc",
-            "orderby": orderby,
+            "orderby": sort_map[sort],
             "inclusion": "OR",
             "exclusion": "OR"
         }
 
         try:
             response = self.client.post(api_url, data=payload)
+            response.raise_for_status()
+            
+            # The theme returns HTML fragments inside the response
             soup = BeautifulSoup(response.text, "html.parser")
             results = []
 
+            # Selector based on: "div > a[href*=/manga/]:has(> img)"
             for item in soup.select("div:has(> a[href*='/manga/'] img)"):
                 link_tag = item.select_one("a[href*='/manga/']")
                 img_tag = item.select_one("img")
@@ -148,7 +149,7 @@ class NatsuExtractor:
                         manga_url=link_tag["href"],
                         cover_url=img_tag.get("src") or img_tag.get("data-src")
                     ))
-            return results
+            return results[::2]
         except Exception as e:
             print(f"Search failed: {e}")
             return []

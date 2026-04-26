@@ -30,7 +30,7 @@ async def search_manga(
         # Internal logic now forces 'type[]=manga' for Japanese content
         natsu = NatsuExtractor(session)
         results = natsu.search(query=query_clean, page=page, sort=sort)
-        
+        print(results)
         # 2. Fallback: Mangafire
         # Triggered if Natsu returns no results or if page 1 is empty
         if not results:
