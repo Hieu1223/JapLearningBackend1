@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from ..database import SessionDep
-from .rawkuma_extractor import NatsuExtractor as MangafireExtractor
-from .manga_ocr import do_ocr
-from .schema import MangaInfo,ChapterInfo,OCRResponse
-router = APIRouter(tags=['Manga'])
 
+# Cleaned up imports for clarity
+from .rawkuma_extractor import NatsuExtractor
+from .manga_extractor import MangafireExtractor
+from .manga_ocr import do_ocr
+from .schema import MangaInfo, ChapterInfo, OCRResponse
+
+router = APIRouter(tags=['Manga'])
 
 @router.get("/search")
 async def search_manga(
@@ -16,9 +19,21 @@ async def search_manga(
         raise HTTPException(status_code=400, detail="Query is required")
 
     try:
-        return  MangafireExtractor(session).search(query)
+        # 1. Try NatsuID (Rawkuma) first
+        natsu = NatsuExtractor(session)
+        results = await natsu.search(query)
+        
+        # 2. If no results found, fallback to Mangafire
+        if not results:
+            return await MangafireExtractor(session).search(query)
+            
+        return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # If Natsu fails entirely, try Mangafire as a last resort before erroring
+        try:
+            return await MangafireExtractor(session).search(query)
+        except:
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get('/chapter_list')
@@ -30,7 +45,13 @@ async def get_chapter_list(
         raise HTTPException(status_code=400, detail="manga_url is required")
 
     try:
-        return  MangafireExtractor(session).get_chapter_list(manga_url)
+        # Determine extractor based on URL
+        # NatsuID uses the full Base URL (e.g., rawkuma.net)
+        natsu = NatsuExtractor(session)
+        if natsu.base_url in manga_url:
+            return await natsu.get_chapter_list(manga_url)
+        else:
+            return await MangafireExtractor(session).get_chapter_list(manga_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -44,7 +65,13 @@ async def get_images(
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
     try:
-        return MangafireExtractor(session).get_chapter_images(chapter_url)
+        # Determine extractor based on URL
+        natsu = NatsuExtractor(session)
+        if natsu.base_url in chapter_url:
+            return await natsu.get_page_images(chapter_url)
+        else:
+            # Note: Your MangafireExtractor uses 'get_chapter_images' 
+            return await MangafireExtractor(session).get_chapter_images(chapter_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -58,7 +85,7 @@ async def get_ocr_data(
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
     try:
-        data = await do_ocr(session,chapter_url)
+        data = await do_ocr(session, chapter_url)
         return OCRResponse(pages=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
