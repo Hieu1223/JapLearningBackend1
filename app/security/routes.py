@@ -18,7 +18,3 @@ def login(session: SessionDep, form: OAuth2PasswordRequestForm = Depends()):
     # Generate token using the linked Profile user_id
     token = create_token(auth_entry.user_id)
     return {"access_token": token, "token_type": "bearer"}
-
-@router.get('/check')
-def check_valid(user : CurrentUser):
-    return {'logged_in' : True}

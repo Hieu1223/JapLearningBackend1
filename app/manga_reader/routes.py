@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from ..database import SessionDep
-from .manga_extractor import MangafireExtractor
+from .rawkuma_extractor import NatsuExtractor as MangafireExtractor
 from .manga_ocr import do_ocr
 from .schema import MangaInfo,ChapterInfo,OCRResponse
 router = APIRouter(tags=['Manga'])
@@ -16,7 +16,7 @@ async def search_manga(
         raise HTTPException(status_code=400, detail="Query is required")
 
     try:
-        return await MangafireExtractor(session).search(query)
+        return  MangafireExtractor(session).search(query)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -30,7 +30,7 @@ async def get_chapter_list(
         raise HTTPException(status_code=400, detail="manga_url is required")
 
     try:
-        return await MangafireExtractor(session).get_chapter_list(manga_url)
+        return  MangafireExtractor(session).get_chapter_list(manga_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -44,7 +44,7 @@ async def get_images(
         raise HTTPException(status_code=400, detail="chapter_url is required")
 
     try:
-        return await MangafireExtractor(session).get_chapter_images(chapter_url)
+        return MangafireExtractor(session).get_chapter_images(chapter_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -19,7 +19,17 @@ import asyncio
 import json
 from bs4 import BeautifulSoup
 BASE_URL = os.getenv("BASE_URL", "https://mangafire.to")
-
+from .filter import (
+    UriBuilder,
+    TypeFilter,
+    GenreFilter,
+    GenreModeFilter,
+    StatusFilter,
+    YearFilter,
+    MinChapterFilter,
+    SortFilter,
+    TriState
+)
 
 
 
@@ -102,6 +112,8 @@ class MangafireExtractor:
         update_mangas_info(self.session, cached_mangas)
         return mangas
     
+    async def home(self):
+        mangas = self.crawl_search_page("",0, "")
 
     async def get_chapter_list(self,manga_url):
         return extract_chapters(manga_url)
