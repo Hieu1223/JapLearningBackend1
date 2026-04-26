@@ -15,6 +15,7 @@ class NatsuExtractor:
         proxy_url = os.getenv("HTTP_PROXY")
         self.client.proxies = {
             "http": proxy_url,
+            "https" : proxy_url
         }
         self.client.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36",
