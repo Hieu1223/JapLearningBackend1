@@ -7,9 +7,9 @@ from typing import List
 from sqlmodel import Session
 from app.manga_reader.schema import MangaInfo
 from app.database.manga_reader.schema import Chapter
-from app.database.manga_reader.queries import get_or_create_chapter, get_or_create_manga
-
-
+from app.database.manga_reader.queries import get_or_create_chapter, get_or_create_manga,update_chapter_pages
+import json
+from sqlmodel import select
 class NatsuExtractor:
     def __init__(self, db_session: Session):
         self.db = db_session
@@ -101,9 +101,21 @@ class NatsuExtractor:
 
     def get_page_images(self, chapter_url: str) -> List[str]:
         """Logic from Kotlin: pageListParse()"""
+
+
+        chapter = self.db.exec(
+            select(Chapter).where(Chapter.link == chapter_url)
+        ).first()
+
+        if chapter and chapter.image_list and chapter.image_list not in ("{}", "[]", ""):
+            try:
+                return json.loads(chapter.image_list)
+            except Exception as e:
+                print(e)
+
+
         res = self.client.get(chapter_url)
         soup = BeautifulSoup(res.text, "html.parser")
-
         images = []
         for img in soup.select("main .relative section img, #readerarea img"):
             url = img.get("src") or img.get("data-src")
@@ -118,12 +130,13 @@ class NatsuExtractor:
         # Save to DB in background so the response is returned immediately
         def _save():
             try:
-                get_or_create_chapter(self.db, chapter_url, image_list=images)
+                print(images)
+                update_chapter_pages(self.db, chapter_url, images)
             except Exception as e:
                 print(f"Background save failed for {chapter_url}: {e}")
 
         threading.Thread(target=_save, daemon=True).start()
-
+        #_save()
         return images
 
     def search(self, query: str, page: int = 1, sort: str = "") -> List[MangaInfo]:

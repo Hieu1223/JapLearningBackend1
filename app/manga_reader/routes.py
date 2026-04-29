@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 from ..database import SessionDep
 from .rawkuma_extractor import NatsuExtractor
 from .manga_extractor import MangafireExtractor
-from .manga_ocr import do_ocr
+from .manga_ocr import do_ocr,do_ocr_stream
 from .schema import MangaInfo, ChapterInfo, OCRResponse
 from .sort_type import SortType
 from ..database.manga_reader.queries import (
@@ -18,7 +19,7 @@ from ..database.manga_reader.queries import (
     get_manga_with_url
 )
 from ..security.auth import CurrentUser
-
+import json
 router = APIRouter(tags=["Manga"])
 
 
@@ -230,3 +231,30 @@ async def get_ocr_data(
         return OCRResponse(pages=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.get("/ocr_data/stream")
+async def get_ocr_data_stream(
+    session: SessionDep,
+    chapter_url: str,
+):
+    if not chapter_url:
+        raise HTTPException(status_code=400, detail="chapter_url is required")
+
+    async def event_generator():
+        try:
+            async for page in do_ocr_stream(session, chapter_url):
+                yield f"data: {json.dumps(page)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disables buffering in nginx
+        },
+    )

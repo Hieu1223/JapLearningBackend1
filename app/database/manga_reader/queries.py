@@ -79,13 +79,18 @@ def get_cached_chapter_info(session: Session, chapter_url: str) -> Chapter | Non
     return session.exec(statement).first()
 
 
-def update_chapter_pages(session: Session, chapter_id: UUID, pages: list[str]):
-    """Updates the image_list for a chapter. Expects a list of URL strings."""
-    chapter = session.get(Chapter, chapter_id)
-    if chapter:
-        chapter.image_list = json.dumps(pages)
-        session.add(chapter)
-        session.commit()
+def update_chapter_pages(session: Session, chapter_url: UUID, pages: list[str]):
+    """Updates image_list using chapter link."""
+    statement = select(Chapter).where(Chapter.link == chapter_url)
+    chapter = session.exec(statement).first()
+
+    if not chapter:
+        return None  # or raise Exception if you want strict behavior
+
+    chapter.image_list = json.dumps(pages)
+    session.commit()
+    session.refresh(chapter)
+    return chapter
 
 
 def get_cached_pages(session: Session, chapter_id: UUID) -> list[str]:
@@ -104,8 +109,6 @@ def update_chapter_ocr(session: Session, chapter_id: UUID, ocr_data: str):
 
     chapter.ocr_data = ocr_data
     chapter.transcripted = True
-
-    session.add(chapter)
     session.commit()
     session.refresh(chapter)
     return chapter
@@ -274,10 +277,6 @@ def upsert_chapter(
     chapter = session.exec(statement).first()
 
     if chapter:
-        if image_list is not None:
-            chapter.image_list = json.dumps(image_list)
-        if ocr_data is not None:
-            chapter.ocr_data = ocr_data
         if title:
             chapter.title = title
         if num:
