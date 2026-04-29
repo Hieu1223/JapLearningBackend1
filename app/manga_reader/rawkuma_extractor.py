@@ -6,10 +6,13 @@ from bs4 import BeautifulSoup
 from typing import List
 from sqlmodel import Session
 from app.manga_reader.schema import MangaInfo
-from app.database.manga_reader.schema import Chapter
-from app.database.manga_reader.queries import get_or_create_chapter, get_or_create_manga,update_chapter_pages
+from app.database.manga_reader.schema import Chapter,NonceToken
+from app.database.manga_reader.queries import get_or_create_chapter, get_or_create_manga,update_chapter_pages,get_nonce,refresh_nonce
 import json
 from sqlmodel import select
+from datetime import timedelta,datetime
+import time
+
 class NatsuExtractor:
     def __init__(self, db_session: Session):
         self.db = db_session
@@ -20,6 +23,9 @@ class NatsuExtractor:
             "http": proxy_url,
             "https": proxy_url,
         }
+        self._nonce_cache = None
+        self._nonce_time = 0
+        self._nonce_ttl = 600  # YOU decide this
         self.client.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -162,6 +168,15 @@ class NatsuExtractor:
         try:
             response = self.client.post(api_url, data=payload)
             response.raise_for_status()
+            if response.status_code != 200:
+                nonce = self._fetch_nonce()
+                nonce = refresh_nonce(self.db, nonce)
+
+                self._nonce_cache = nonce
+                self._nonce_time = time.time()
+
+                payload["nonce"] = nonce
+                response = self.client.post(api_url, data=payload)
 
             soup = BeautifulSoup(response.text, "html.parser")
             results = []
@@ -200,18 +215,47 @@ class NatsuExtractor:
             return []
 
     def _get_nonce(self) -> str:
-        """Fetches the WordPress AJAX nonce required for search/list actions."""
+        now = time.time()
+
+        # try memory first
+        if self._nonce_cache and now - self._nonce_time <= self._nonce_ttl:
+            return self._nonce_cache
+
+        # try DB
+        nonce = get_nonce(self.db)
+
+        if nonce:
+            # update memory cache
+            self._nonce_cache = nonce
+            self._nonce_time = now
+            return nonce
+
+        # fetch new
+        nonce = self._fetch_nonce()
+        nonce = refresh_nonce(self.db, nonce)
+
+        # update memory cache
+        self._nonce_cache = nonce
+        self._nonce_time = now
+
+        return nonce
+
+    def _fetch_nonce(self) -> str:
         url = (
             f"{self.base_url}/wp-admin/admin-ajax.php"
             "?type=search_form&action=get_nonce"
         )
+
         try:
             res = self.client.get(url, timeout=10)
             soup = BeautifulSoup(res.text, "html.parser")
-            nonce = soup.select_one("input[name=search_nonce]")
-            if not nonce:
-                raise ValueError("Nonce field not found in response")
-            return nonce["value"]
+            nonce_tag = soup.select_one("input[name=search_nonce]")
+
+            if not nonce_tag:
+                raise ValueError("Nonce field not found")
+
+            return nonce_tag["value"]
+
         except Exception as e:
-            print(f"Nonce Retrieval Error: {e}")
+            print(f"Nonce fetch error: {e}")
             return ""

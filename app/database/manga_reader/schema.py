@@ -47,3 +47,8 @@ class ReadHistory(SQLModel, table=True):
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+class NonceToken(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    token: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)

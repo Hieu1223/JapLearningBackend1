@@ -1,8 +1,8 @@
 import json
-from sqlmodel import Session, select, col
+from sqlmodel import Session,delete, select, col
 from uuid import UUID
-from .schema import Manga, Chapter, QueryVRFToken, ReadHistory
-from datetime import datetime, timezone
+from .schema import Manga, Chapter, QueryVRFToken, ReadHistory,NonceToken
+from datetime import datetime, timezone,timedelta
 from typing import Optional
 
 
@@ -295,3 +295,29 @@ def upsert_chapter(
     session.commit()
     session.refresh(chapter)
     return chapter
+
+
+
+def get_nonce(db: Session) -> str:
+    try:
+        stmt = select(NonceToken).order_by(NonceToken.created_at.desc())
+        token_obj = db.exec(stmt).first()
+        return token_obj.token if token_obj else ""
+    except Exception as e:
+        print(f"[get_nonce] error: {e}")
+        return ""
+    
+
+def refresh_nonce(db: Session, token: str) -> str:
+    try:
+        if not token:
+            return ""
+
+        db.exec(delete(NonceToken))  # wipe old
+        db.add(NonceToken(token=token))
+        db.commit()
+
+        return token
+    except Exception as e:
+        print(f"[refresh_nonce] error: {e}")
+        return ""
