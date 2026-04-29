@@ -14,7 +14,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           }
@@ -193,7 +195,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -646,7 +650,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -859,7 +865,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1286,7 +1294,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1469,7 +1479,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1516,7 +1528,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1721,7 +1735,7 @@
           {
             "name": "query",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "anyOf": [
                 {
@@ -1731,6 +1745,7 @@
                   "type": "null"
                 }
               ],
+              "default": "%20",
               "title": "Query"
             }
           },
@@ -1888,6 +1903,7 @@
           "Manga"
         ],
         "summary": "Update History",
+        "description": "Upsert a reading-progress record.\n\nThe client sends URLs (which it already has); this route resolves or\ncreates the corresponding Manga and Chapter rows, then delegates to\nthe query layer which works purely with UUIDs.",
         "operationId": "update_history_manga_history_upsert_post",
         "requestBody": {
           "content": {
@@ -1934,6 +1950,7 @@
           "Manga"
         ],
         "summary": "Read User History",
+        "description": "Returns the user's reading history, enriched with manga name/cover\nand chapter title/num — most recently updated first.",
         "operationId": "read_user_history_manga_history__user_id__get",
         "responses": {
           "200": {
@@ -1983,6 +2000,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OCRResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manga/ocr_data/stream": {
+      "get": {
+        "tags": [
+          "Manga"
+        ],
+        "summary": "Get Ocr Data Stream",
+        "operationId": "get_ocr_data_stream_manga_ocr_data_stream_get",
+        "parameters": [
+          {
+            "name": "chapter_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
                 }
               }
             }
@@ -2779,38 +2838,64 @@
             "format": "uuid",
             "title": "User Id"
           },
-          "manga_url": {
-            "type": "string",
-            "title": "Manga Url"
-          },
-          "current_chapter_url": {
-            "type": "string",
-            "title": "Current Chapter Url"
-          },
-          "current_chapter_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Chapter Name"
+          "current_page": {
+            "type": "integer",
+            "title": "Current Page"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "manga_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Manga Id"
+          },
+          "manga_url": {
+            "type": "string",
+            "title": "Manga Url"
+          },
+          "manga_name": {
+            "type": "string",
+            "title": "Manga Name"
+          },
+          "manga_cover_url": {
+            "type": "string",
+            "title": "Manga Cover Url"
+          },
+          "chapter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chapter Id"
+          },
+          "chapter_url": {
+            "type": "string",
+            "title": "Chapter Url"
+          },
+          "chapter_title": {
+            "type": "string",
+            "title": "Chapter Title"
+          },
+          "chapter_num": {
+            "type": "string",
+            "title": "Chapter Num"
           }
         },
         "type": "object",
         "required": [
           "id",
           "user_id",
+          "current_page",
+          "updated_at",
+          "manga_id",
           "manga_url",
-          "current_chapter_url",
-          "updated_at"
+          "manga_name",
+          "manga_cover_url",
+          "chapter_id",
+          "chapter_url",
+          "chapter_title",
+          "chapter_num"
         ],
         "title": "ReadHistoryResponse"
       },
@@ -2820,11 +2905,7 @@
             "type": "string",
             "title": "Manga Url"
           },
-          "current_chapter_url": {
-            "type": "string",
-            "title": "Current Chapter Url"
-          },
-          "current_chapter_name": {
+          "manga_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -2833,15 +2914,62 @@
                 "type": "null"
               }
             ],
-            "title": "Current Chapter Name"
+            "title": "Manga Name",
+            "default": ""
+          },
+          "manga_cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manga Cover Url",
+            "default": ""
+          },
+          "chapter_url": {
+            "type": "string",
+            "title": "Chapter Url"
+          },
+          "chapter_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Title",
+            "default": ""
+          },
+          "chapter_num": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Num",
+            "default": ""
+          },
+          "current_page": {
+            "type": "integer",
+            "title": "Current Page",
+            "default": 0
           }
         },
         "type": "object",
         "required": [
           "manga_url",
-          "current_chapter_url"
+          "chapter_url"
         ],
-        "title": "ReadHistoryUpdate"
+        "title": "ReadHistoryUpdate",
+        "description": "Callers send human-readable URLs; the route resolves them to DB IDs.\nmanga_name and cover_url are used to create the Manga row if it doesn't\nexist yet (they are optional — existing rows won't be overwritten)."
       },
       "RegisterRequest": {
         "properties": {
@@ -3555,7 +3683,9 @@
         "type": "oauth2",
         "flows": {
           "password": {
-            "scopes": {},
+            "scopes": {
+
+            },
             "tokenUrl": "token"
           }
         }

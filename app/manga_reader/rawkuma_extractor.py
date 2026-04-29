@@ -140,10 +140,8 @@ class NatsuExtractor:
         return images
 
     def search(self, query: str, page: int = 1, sort: str = "") -> List[MangaInfo]:
-        """Performs a POST search using the NatsuId multipart strategy."""
-        api_url = (
-            f"{self.base_url}/wp-admin/admin-ajax.php?action=advanced_search"
-        )
+        api_url = f"{self.base_url}/wp-admin/admin-ajax.php?action=advanced_search"
+
         sort_map = {
             "recently_updated": "updated",
             "most_viewed": "popular",
@@ -173,27 +171,30 @@ class NatsuExtractor:
                 img_tag = item.select_one("img")
 
                 if link_tag and img_tag:
-                    manga_url = link_tag["href"]
-                    name = img_tag.get("alt", "Unknown")
-                    cover_url = img_tag.get("src") or img_tag.get("data-src", "")
-
-                    # Persist / update with name now available
-                    get_or_create_manga(
-                        self.db,
-                        manga_url=manga_url,
-                        cover_url=cover_url,
-                        name=name,
-                    )
-
                     results.append(
                         MangaInfo(
-                            name=name,
-                            manga_url=manga_url,
-                            cover_url=cover_url,
+                            name=img_tag.get("alt", "Unknown"),
+                            manga_url=link_tag["href"],
+                            cover_url=img_tag.get("src") or img_tag.get("data-src", ""),
                         )
                     )
 
+            # 🔥 background save
+            import threading
+
+            def save():
+                for manga in results:
+                    get_or_create_manga(
+                        self.db,
+                        manga_url=manga.manga_url,
+                        cover_url=manga.cover_url,
+                        name=manga.name,
+                    )
+
+            threading.Thread(target=save, daemon=True).start()
+
             return results
+
         except Exception as e:
             print(f"Search failed: {e}")
             return []
