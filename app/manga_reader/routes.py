@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from ..database import SessionDep
 from .rawkuma_extractor import NatsuExtractor
-from .manga_extractor import MangafireExtractor
 from .manga_ocr import do_ocr,do_ocr_stream
 from .schema import MangaInfo, ChapterInfo, OCRResponse
 from .sort_type import SortType
@@ -80,20 +79,12 @@ async def search_manga(
         natsu = NatsuExtractor(session)
         results = natsu.search(query=query_clean, page=page, sort=sort)
         print(results)
-        if not results:
-            mf = MangafireExtractor(session)
-            return await mf.search(query=query_clean, page=page, sort=sort)
         return results
     except Exception as e:
-        try:
-            mf = MangafireExtractor(session)
-            return await mf.search(query=query_clean, page=page, sort=sort)
-        except Exception as inner_e:
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    f"Both sources failed. "
-                    f"Original error: {str(e)} | Fallback error: {str(inner_e)}"
+                    f"error: {str(e)}"
                 ),
             )
 
@@ -110,10 +101,7 @@ async def get_chapter_list(
 
     try:
         natsu = NatsuExtractor(session)
-        if natsu.base_url in manga_url:
-            return natsu.get_chapter_list(manga_url)
-        else:
-            return await MangafireExtractor(session).get_chapter_list(manga_url)
+        return natsu.get_chapter_list(manga_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -130,10 +118,7 @@ async def get_images(
 
     try:
         natsu = NatsuExtractor(session)
-        if natsu.base_url in chapter_url:
-            return natsu.get_page_images(chapter_url)
-        else:
-            return await MangafireExtractor(session).get_chapter_images(chapter_url)
+        return natsu.get_page_images(chapter_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

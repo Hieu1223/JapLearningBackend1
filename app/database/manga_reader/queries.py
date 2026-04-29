@@ -4,7 +4,7 @@ from uuid import UUID
 from .schema import Manga, Chapter, QueryVRFToken, ReadHistory,NonceToken
 from datetime import datetime, timezone,timedelta
 from typing import Optional
-
+from ..cache import CacheItem, fetch_cache, update_cache
 
 # ── Search & VRF Cache ────────────────────────────────────────────────────────
 
@@ -300,24 +300,22 @@ def upsert_chapter(
 
 def get_nonce(db: Session) -> str:
     try:
-        stmt = select(NonceToken).order_by(NonceToken.created_at.desc())
-        token_obj = db.exec(stmt).first()
-        return token_obj.token if token_obj else ""
+        item = fetch_cache(db, "nonce")
+        return item.extra_data if item else ""
     except Exception as e:
         print(f"[get_nonce] error: {e}")
         return ""
     
+
 
 def refresh_nonce(db: Session, token: str) -> str:
     try:
         if not token:
             return ""
 
-        db.exec(delete(NonceToken))  # wipe old
-        db.add(NonceToken(token=token))
-        db.commit()
-
+        update_cache(db, "nonce", token)
         return token
+
     except Exception as e:
         print(f"[refresh_nonce] error: {e}")
         return ""
