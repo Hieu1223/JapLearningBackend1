@@ -195,3 +195,6 @@ def get_orphaned_transcriptions(session: Session):
 
     results = session.exec(stmt).all()
     return results
+
+
+

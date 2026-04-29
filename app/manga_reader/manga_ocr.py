@@ -33,11 +33,11 @@ async def do_ocr(session, chapter_url: str):
         # 5. Validate AND Dump
         # model_validate fixes the types (np.int32 -> int)
         # .model_dump() turns the object into a plain Python dict
-        print(res)
         validated_data = [OCRPage.model_validate(page).model_dump() for page in res]
         # 6. Save to DB
         # Now validated_data is a plain list of dicts, so json.dumps works perfectly
         ocr_result_string = json.dumps(validated_data)
+        print(res)
         #print(ocr_result_string)
         update_chapter_ocr(session, chapter.id, ocr_result_string)
     except Exception as e:

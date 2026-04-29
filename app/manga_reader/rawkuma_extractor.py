@@ -1,12 +1,15 @@
 import os
-import json
+import re
+import threading
 import requests
 from bs4 import BeautifulSoup
-from typing import List, Optional
+from typing import List
 from sqlmodel import Session
 from app.manga_reader.schema import MangaInfo
 from app.database.manga_reader.schema import Chapter
-import re
+from app.database.manga_reader.queries import get_or_create_chapter, get_or_create_manga
+
+
 class NatsuExtractor:
     def __init__(self, db_session: Session):
         self.db = db_session
@@ -15,13 +18,15 @@ class NatsuExtractor:
         proxy_url = os.getenv("HTTP_PROXY")
         self.client.proxies = {
             "http": proxy_url,
-            "https" : proxy_url
+            "https": proxy_url,
         }
         self.client.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "Chrome/110.0.0.0 Safari/537.36"
+            ),
             "Referer": f"{self.base_url}/",
         })
-        
 
     def get_manga_id(self, manga_url: str) -> str:
         """
@@ -33,26 +38,23 @@ class NatsuExtractor:
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "html.parser")
 
-            # Method 1: Check hx-get attribute (Common in NatsuId themes)
-            # Example: hx-get=".../admin-ajax.php?action=chapter_list&manga_id=123"
+            # Method 1: hx-get / data-id attribute
             ajax_trigger = soup.select_one("#gallery-list, .load-chapters")
             if ajax_trigger:
                 attr = ajax_trigger.get("hx-get") or ajax_trigger.get("data-id")
                 if attr:
-                    match = re.search(r'manga_id=(\d+)', attr)
+                    match = re.search(r"manga_id=(\d+)", attr)
                     if match:
                         return match.group(1)
                     if attr.isdigit():
                         return attr
 
-            # Method 2: Check for the shortlink (Standard WordPress)
-            # Example: <link rel='shortlink' href='https://site.com/?p=123' />
+            # Method 2: WordPress shortlink
             shortlink = soup.select_one("link[rel='shortlink']")
             if shortlink and "p=" in shortlink["href"]:
                 return shortlink["href"].split("p=")[-1]
 
-            # Method 3: Body classes
-            # Example: <body class="manga-template-default postid-123 ...">
+            # Method 3: body class postid-{id}
             body = soup.find("body")
             if body and body.has_attr("class"):
                 for cls in body["class"]:
@@ -72,33 +74,38 @@ class NatsuExtractor:
         if not manga_id:
             return []
 
-        params = {
-            "action": "chapter_list",
-            "manga_id": manga_id
-        }
-        
-        # AJAX call mimicking the Kotlin source
-        res = self.client.get(f"{self.base_url}/wp-admin/admin-ajax.php", params=params)
+        params = {"action": "chapter_list", "manga_id": manga_id}
+        res = self.client.get(
+            f"{self.base_url}/wp-admin/admin-ajax.php", params=params
+        )
         soup = BeautifulSoup(res.text, "html.parser")
-        
+
         chapters = []
         for i, row in enumerate(reversed(soup.select("div a:has(time)"))):
-            chapters.append({
-                'num': f'{i}',
-                "title": row.select_one("span").text.strip() if row.select_one("span") else "Chapter",
-                "url": row["href"],
-            })
+            chapter_url = row["href"]
+            title_tag = row.select_one("span")
+            title = title_tag.text.strip() if title_tag else "Chapter"
+            num = str(i)
+
+            # Persist to DB so history resolution can find chapters by URL
+            get_or_create_chapter(
+                self.db,
+                chapter_url=chapter_url,
+                title=title,
+                num=num,
+            )
+
+            chapters.append({"num": num, "title": title, "url": chapter_url})
+
         return chapters
 
     def get_page_images(self, chapter_url: str) -> List[str]:
         """Logic from Kotlin: pageListParse()"""
         res = self.client.get(chapter_url)
         soup = BeautifulSoup(res.text, "html.parser")
-        
-        # Selector: "main .relative section > img" + common fallback "#readerarea img"
+
         images = []
         for img in soup.select("main .relative section img, #readerarea img"):
-            # Kotlin logic handles absUrl; Python requests/bs4 requires manual check
             url = img.get("src") or img.get("data-src")
             if url:
                 if not url.startswith("http"):
@@ -107,62 +114,83 @@ class NatsuExtractor:
 
         # Remove duplicates while preserving order
         images = list(dict.fromkeys(images))
-        new_chapter = Chapter(
-                link=chapter_url,
-                image_list=json.dumps(images)
-        )
-        self.db.add(new_chapter)
-        self.db.commit()
-        self.db.refresh(new_chapter)
-            
+
+        # Save to DB in background so the response is returned immediately
+        def _save():
+            try:
+                get_or_create_chapter(self.db, chapter_url, image_list=images)
+            except Exception as e:
+                print(f"Background save failed for {chapter_url}: {e}")
+
+        threading.Thread(target=_save, daemon=True).start()
+
         return images
-    def search(self, query: str, page: int = 1,sort="") -> List[MangaInfo]:
+
+    def search(self, query: str, page: int = 1, sort: str = "") -> List[MangaInfo]:
         """Performs a POST search using the NatsuId multipart strategy."""
-        api_url = f"{self.base_url}/wp-admin/admin-ajax.php?action=advanced_search"
+        api_url = (
+            f"{self.base_url}/wp-admin/admin-ajax.php?action=advanced_search"
+        )
         sort_map = {
             "recently_updated": "updated",
             "most_viewed": "popular",
             "scores": "rating",
-            "title_az": "title"
+            "title_az": "title",
         }
-        # Constructing the form data payload mimicking the Kotlin MultipartBody
+
         payload = {
             "nonce": self._get_nonce(),
             "page": str(page),
             "query": query,
             "order": "desc",
-            "orderby": sort_map[sort],
+            "orderby": sort_map.get(sort, "updated"),
             "inclusion": "OR",
-            "exclusion": "OR"
+            "exclusion": "OR",
         }
 
         try:
             response = self.client.post(api_url, data=payload)
             response.raise_for_status()
-            
-            # The theme returns HTML fragments inside the response
+
             soup = BeautifulSoup(response.text, "html.parser")
             results = []
 
-            # Selector based on: "div > a[href*=/manga/]:has(> img)"
-            for item in soup.select("div:has(> a[href*='/manga/'] img)"):
+            for item in soup.select("div:has(> a[href*='/manga/'] img)")[::2]:
                 link_tag = item.select_one("a[href*='/manga/']")
                 img_tag = item.select_one("img")
-                
+
                 if link_tag and img_tag:
-                    results.append(MangaInfo(
-                        name=img_tag.get("alt", "Unknown"),
-                        manga_url=link_tag["href"],
-                        cover_url=img_tag.get("src") or img_tag.get("data-src")
-                    ))
-            return results[::2]
+                    manga_url = link_tag["href"]
+                    name = img_tag.get("alt", "Unknown")
+                    cover_url = img_tag.get("src") or img_tag.get("data-src", "")
+
+                    # Persist / update with name now available
+                    get_or_create_manga(
+                        self.db,
+                        manga_url=manga_url,
+                        cover_url=cover_url,
+                        name=name,
+                    )
+
+                    results.append(
+                        MangaInfo(
+                            name=name,
+                            manga_url=manga_url,
+                            cover_url=cover_url,
+                        )
+                    )
+
+            return results
         except Exception as e:
             print(f"Search failed: {e}")
             return []
-        
+
     def _get_nonce(self) -> str:
         """Fetches the WordPress AJAX nonce required for search/list actions."""
-        url = f"{self.base_url}/wp-admin/admin-ajax.php?type=search_form&action=get_nonce"
+        url = (
+            f"{self.base_url}/wp-admin/admin-ajax.php"
+            "?type=search_form&action=get_nonce"
+        )
         try:
             res = self.client.get(url, timeout=10)
             soup = BeautifulSoup(res.text, "html.parser")

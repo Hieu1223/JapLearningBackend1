@@ -3,6 +3,9 @@ from sqlmodel import Session, select, col
 from uuid import UUID
 from .schema import Manga, Chapter, QueryVRFToken, ReadHistory
 from datetime import datetime, timezone
+from typing import Optional
+
+
 # ── Search & VRF Cache ────────────────────────────────────────────────────────
 
 def get_cached_search_vrf_token(session: Session, query: str) -> str | None:
@@ -11,18 +14,20 @@ def get_cached_search_vrf_token(session: Session, query: str) -> str | None:
     result = session.exec(statement).first()
     return result.token if result else None
 
+
 def update_cached_search_vrf_token(session: Session, query: str, vrf_token: str):
     """Updates existing token or creates a new entry for the search query."""
     statement = select(QueryVRFToken).where(QueryVRFToken.query == query)
     cache_item = session.exec(statement).first()
-    
+
     if cache_item:
         cache_item.token = vrf_token
     else:
         cache_item = QueryVRFToken(query=query, token=vrf_token)
-    
+
     session.add(cache_item)
     session.commit()
+
 
 # ── Manga Info ────────────────────────────────────────────────────────────────
 
@@ -31,6 +36,7 @@ def get_cached_manga_info(session: Session, manga_urls: list[str]) -> list[Manga
     statement = select(Manga).where(col(Manga.manga_url).in_(manga_urls))
     return list(session.exec(statement).all())
 
+
 def update_mangas_info(session: Session, mangas: list[Manga]):
     """Syncs manga metadata. Updates if manga_url exists, otherwise inserts."""
     for manga in mangas:
@@ -38,11 +44,14 @@ def update_mangas_info(session: Session, mangas: list[Manga]):
         existing = session.exec(statement).first()
         if existing:
             existing.manga_cover_url = manga.manga_cover_url
+            if manga.name:
+                existing.name = manga.name
             existing.has_transcripted_chapters = manga.has_transcripted_chapters
             session.add(existing)
         else:
             session.add(manga)
     session.commit()
+
 
 # ── Chapters ──────────────────────────────────────────────────────────────────
 
@@ -54,19 +63,21 @@ def add_chapter_infos(session: Session, chapters: list[Chapter]):
         if not existing:
             session.add(chapter)
         else:
-            # Update fields if chapter already exists
             existing.title = chapter.title
             existing.num = chapter.num
-            # We don't overwrite ocr_data or image_list unless provided in 'chapter'
-            if chapter.ocr_data: existing.ocr_data = chapter.ocr_data
-            if chapter.image_list != "{}": existing.image_list = chapter.image_list
+            if chapter.ocr_data:
+                existing.ocr_data = chapter.ocr_data
+            if chapter.image_list not in ("{}", "[]", ""):
+                existing.image_list = chapter.image_list
             session.add(existing)
     session.commit()
+
 
 def get_cached_chapter_info(session: Session, chapter_url: str) -> Chapter | None:
     """Retrieves a single chapter's metadata by its link."""
     statement = select(Chapter).where(Chapter.link == chapter_url)
     return session.exec(statement).first()
+
 
 def update_chapter_pages(session: Session, chapter_id: UUID, pages: list[str]):
     """Updates the image_list for a chapter. Expects a list of URL strings."""
@@ -76,6 +87,7 @@ def update_chapter_pages(session: Session, chapter_id: UUID, pages: list[str]):
         session.add(chapter)
         session.commit()
 
+
 def get_cached_pages(session: Session, chapter_id: UUID) -> list[str]:
     """Retrieves the list of image URLs for a chapter."""
     chapter = session.get(Chapter, chapter_id)
@@ -83,65 +95,204 @@ def get_cached_pages(session: Session, chapter_id: UUID) -> list[str]:
         return json.loads(chapter.image_list)
     return []
 
+
 def update_chapter_ocr(session: Session, chapter_id: UUID, ocr_data: str):
-    """
-    Updates the OCR result and marks the chapter as transcripted.
-    """
+    """Updates the OCR result and marks the chapter as transcripted."""
     chapter = session.get(Chapter, chapter_id)
     if not chapter:
         raise Exception(f"Cannot update OCR: Chapter {chapter_id} not found.")
-    
+
     chapter.ocr_data = ocr_data
     chapter.transcripted = True
-    
+
     session.add(chapter)
     session.commit()
     session.refresh(chapter)
     return chapter
 
+
 # ── History ───────────────────────────────────────────────────────────────────
-def get_read_histories(session: Session, user_id: UUID) -> list[ReadHistory]:
+
+class ReadHistoryWithDetails:
+    """In-memory joined result returned by get_read_histories."""
+
+    def __init__(
+        self,
+        history: ReadHistory,
+        manga: Manga,
+        chapter: Chapter,
+    ):
+        self.id = history.id
+        self.user_id = history.user_id
+        self.current_page = history.current_page
+        self.updated_at = history.updated_at
+
+        # Manga fields
+        self.manga_id = manga.id
+        self.manga_url = manga.manga_url
+        self.manga_name = manga.name
+        self.manga_cover_url = manga.manga_cover_url
+
+        # Chapter fields
+        self.chapter_id = chapter.id
+        self.chapter_url = chapter.link
+        self.chapter_title = chapter.title
+        self.chapter_num = chapter.num
+
+
+def get_read_histories(
+    session: Session, user_id: UUID
+) -> list[ReadHistoryWithDetails]:
     """
-    Returns a list of history records for the user, 
-    sorted by the most recently updated.
+    Returns enriched history records for the user (most recently updated first),
+    joining Manga and Chapter for name, cover URL, and chapter title.
     """
     statement = (
-        select(ReadHistory)
+        select(ReadHistory, Manga, Chapter)
+        .join(Manga, ReadHistory.manga_id == Manga.id)
+        .join(Chapter, ReadHistory.chapter_id == Chapter.id)
         .where(ReadHistory.user_id == user_id)
         .order_by(ReadHistory.updated_at.desc())
     )
-    return list(session.exec(statement).all())
+    rows = session.exec(statement).all()
+    return [
+        ReadHistoryWithDetails(history=h, manga=m, chapter=c)
+        for h, m, c in rows
+    ]
 
 
 def upsert_read_history_query(
-    session: Session, 
+    session: Session,
     user_id: UUID,
-    manga_url: str,
-    current_chapter_url: str,
-    current_chapter_name: str = None
+    manga_id: UUID,
+    chapter_id: UUID,
+    current_page: int = 0,
 ) -> ReadHistory:
-    # 1. Search for existing entry
+    """
+    Upserts a ReadHistory row keyed on (user_id, manga_id).
+    Updates chapter_id, current_page, and updated_at on conflict.
+    """
     statement = select(ReadHistory).where(
         ReadHistory.user_id == user_id,
-        ReadHistory.manga_url == manga_url
+        ReadHistory.manga_id == manga_id,
     )
     history_item = session.exec(statement).first()
 
     if history_item:
-        # 2. Update existing fields
-        history_item.current_chapter_url = current_chapter_url
-        history_item.current_chapter_name = current_chapter_name
+        history_item.chapter_id = chapter_id
+        history_item.current_page = current_page
         history_item.updated_at = datetime.now(timezone.utc)
     else:
-        # 3. Create new record
         history_item = ReadHistory(
             user_id=user_id,
-            manga_url=manga_url,
-            current_chapter_url=current_chapter_url,
-            current_chapter_name=current_chapter_name
+            manga_id=manga_id,
+            chapter_id=chapter_id,
+            current_page=current_page,
         )
         session.add(history_item)
 
     session.commit()
     session.refresh(history_item)
     return history_item
+
+
+# ── Convenience helpers ───────────────────────────────────────────────────────
+
+
+def get_manga_with_url(
+    session : Session,
+    manga_url : str
+):
+    statement = select(Manga).where(Manga.manga_url == manga_url)
+    manga = session.exec(statement).first()
+    return manga
+
+
+def get_or_create_manga(
+    session: Session,
+    manga_url: str,
+    cover_url: str = "",
+    name: str = "",
+) -> Manga:
+    statement = select(Manga).where(Manga.manga_url == manga_url)
+    manga = session.exec(statement).first()
+
+    if manga:
+        # Keep metadata fresh when callers supply it
+        if name and not manga.name:
+            manga.name = name
+        if cover_url and not manga.manga_cover_url:
+            manga.manga_cover_url = cover_url
+        session.add(manga)
+        session.commit()
+        session.refresh(manga)
+        return manga
+
+    manga = Manga(manga_url=manga_url, manga_cover_url=cover_url, name=name)
+    session.add(manga)
+    session.commit()
+    session.refresh(manga)
+    return manga
+
+
+def get_or_create_chapter(
+    session: Session,
+    chapter_url: str,
+    image_list: list[str] | None = None,
+    ocr_data: str = "",
+    title: str = "",
+    num: str = "",
+) -> Chapter:
+    statement = select(Chapter).where(Chapter.link == chapter_url)
+    chapter = session.exec(statement).first()
+
+    if chapter:
+        return chapter
+
+    chapter = Chapter(
+        link=chapter_url,
+        image_list=json.dumps(image_list or []),
+        ocr_data=ocr_data,
+        title=title,
+        num=num,
+    )
+    session.add(chapter)
+    session.commit()
+    session.refresh(chapter)
+    return chapter
+
+
+def upsert_chapter(
+    session: Session,
+    chapter_url: str,
+    image_list: list[str] | None = None,
+    ocr_data: str | None = None,
+    title: str = "",
+    num: str = "",
+) -> Chapter:
+    statement = select(Chapter).where(Chapter.link == chapter_url)
+    chapter = session.exec(statement).first()
+
+    if chapter:
+        if image_list is not None:
+            chapter.image_list = json.dumps(image_list)
+        if ocr_data is not None:
+            chapter.ocr_data = ocr_data
+        if title:
+            chapter.title = title
+        if num:
+            chapter.num = num
+        session.add(chapter)
+    else:
+        chapter = Chapter(
+            link=chapter_url,
+            image_list=json.dumps(image_list or []),
+            ocr_data=ocr_data or "",
+            title=title,
+            num=num,
+        )
+        session.add(chapter)
+
+    session.commit()
+    session.refresh(chapter)
+    return chapter
