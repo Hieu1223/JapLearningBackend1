@@ -35,10 +35,10 @@ async def get_or_fetch_words(session: Session, reading: str,dict_form:str) -> Li
     Nếu là Katakana thì đổi sang Hiragana, sau đó tra cứu DB/API.
     """
     if len(dict_form) == 1:
-        search_query = dict_form
+        search_query = jaconv.kata2hira(reading) if is_katakana(reading) else reading
     # 1. Logic kiểm tra và chuyển đổi
     else:
-        search_query = jaconv.kata2hira(reading) if is_katakana(reading) else reading
+        search_query = dict_form
     
     # 2. Kiểm tra DB Cache
     statement = select(Word).where(Word.reading == search_query)
