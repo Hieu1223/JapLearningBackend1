@@ -30,12 +30,15 @@ def is_katakana(text: str) -> bool:
     """Kiểm tra xem chuỗi có chứa ký tự Katakana không."""
     return bool(re.search(r'[\u30a0-\u30ff]', text))
 
-async def get_or_fetch_words(session: Session, reading: str) -> List[Word]:
+async def get_or_fetch_words(session: Session, reading: str,dict_form:str) -> List[Word]:
     """
     Nếu là Katakana thì đổi sang Hiragana, sau đó tra cứu DB/API.
     """
+    if len(dict_form) == 1:
+        search_query = dict_form
     # 1. Logic kiểm tra và chuyển đổi
-    search_query = jaconv.kata2hira(reading) if is_katakana(reading) else reading
+    else:
+        search_query = jaconv.kata2hira(reading) if is_katakana(reading) else reading
     
     # 2. Kiểm tra DB Cache
     statement = select(Word).where(Word.reading == search_query)
@@ -86,7 +89,7 @@ async def tokenize(session: Session, text: str) -> list[Token]:
 
             if pos_main in ALLOWED_POS:
                 # Chỉ lấy danh sách từ nếu thuộc loại từ cần tra
-                potential_words = await get_or_fetch_words(session, reading_raw)
+                potential_words = await get_or_fetch_words(session, reading_raw,dict_form)
                 
                 if potential_words:
                     # Tìm từ khớp với dictionary_form (ưu tiên Kanji)
