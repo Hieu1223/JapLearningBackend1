@@ -70,3 +70,4 @@ requests
 PyJWT
 bcrypt
 numpy
+yt-dlp

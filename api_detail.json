@@ -14,9 +14,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           }
@@ -195,9 +193,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -650,9 +646,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -865,9 +859,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -1294,9 +1286,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -1479,9 +1469,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -1528,9 +1516,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-
-                }
+                "schema": {}
               }
             }
           },
@@ -1724,16 +1710,16 @@
         ]
       }
     },
-    "/manga/search": {
+    "/manga/manga": {
       "get": {
         "tags": [
           "Manga"
         ],
-        "summary": "Search Manga",
-        "operationId": "search_manga_manga_search_get",
+        "summary": "List Manga",
+        "operationId": "list_manga_manga_manga_get",
         "parameters": [
           {
-            "name": "query",
+            "name": "q",
             "in": "query",
             "required": false,
             "schema": {
@@ -1745,35 +1731,30 @@
                   "type": "null"
                 }
               ],
-              "default": "%20",
-              "title": "Query"
+              "title": "Q"
             }
           },
           {
-            "name": "page",
+            "name": "limit",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
               "minimum": 1,
-              "default": 1,
-              "title": "Page"
+              "default": 20,
+              "title": "Limit"
             }
           },
           {
-            "name": "sort",
+            "name": "offset",
             "in": "query",
             "required": false,
             "schema": {
-              "enum": [
-                "recently_updated",
-                "most_viewed",
-                "scores",
-                "title_az"
-              ],
-              "type": "string",
-              "default": "recently_updated",
-              "title": "Sort"
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -1785,9 +1766,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MangaInfo"
+                    "$ref": "#/components/schemas/MangaPreview"
                   },
-                  "title": "Response Search Manga Manga Search Get"
+                  "title": "Response List Manga Manga Manga Get"
                 }
               }
             }
@@ -1805,21 +1786,22 @@
         }
       }
     },
-    "/manga/chapter_list": {
+    "/manga/manga/{manga_id}": {
       "get": {
         "tags": [
           "Manga"
         ],
-        "summary": "Get Chapter List",
-        "operationId": "get_chapter_list_manga_chapter_list_get",
+        "summary": "Get Manga",
+        "operationId": "get_manga_manga_manga__manga_id__get",
         "parameters": [
           {
-            "name": "manga_url",
-            "in": "query",
+            "name": "manga_id",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Manga Url"
+              "format": "uuid",
+              "title": "Manga Id"
             }
           }
         ],
@@ -1829,11 +1811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ChapterInfo"
-                  },
-                  "title": "Response Get Chapter List Manga Chapter List Get"
+                  "$ref": "#/components/schemas/MangaDetail"
                 }
               }
             }
@@ -1851,21 +1829,22 @@
         }
       }
     },
-    "/manga/read": {
+    "/manga/read/{chapter_id}": {
       "get": {
         "tags": [
           "Manga"
         ],
-        "summary": "Get Images",
-        "operationId": "get_images_manga_read_get",
+        "summary": "Read Chapter",
+        "operationId": "read_chapter_manga_read__chapter_id__get",
         "parameters": [
           {
-            "name": "chapter_url",
-            "in": "query",
+            "name": "chapter_id",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Chapter Url"
+              "format": "uuid",
+              "title": "Chapter Id"
             }
           }
         ],
@@ -1875,11 +1854,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "title": "Response Get Images Manga Read Get"
+                  "$ref": "#/components/schemas/ReadResponse"
                 }
               }
             }
@@ -1897,14 +1872,135 @@
         }
       }
     },
-    "/manga/history/upsert": {
+    "/manga/ocr/{chapter_id}": {
+      "get": {
+        "tags": [
+          "Manga"
+        ],
+        "summary": "Get Ocr",
+        "operationId": "get_ocr_manga_ocr__chapter_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OCRResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manga/ocr/stream/{chapter_id}": {
+      "get": {
+        "tags": [
+          "Manga"
+        ],
+        "summary": "Stream Ocr",
+        "operationId": "stream_ocr_manga_ocr_stream__chapter_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manga/history": {
+      "get": {
+        "tags": [
+          "Manga"
+        ],
+        "summary": "Get History",
+        "operationId": "get_history_manga_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReadHistoryResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get History Manga History Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
       "post": {
         "tags": [
           "Manga"
         ],
-        "summary": "Update History",
-        "description": "Upsert a reading-progress record.\n\nThe client sends URLs (which it already has); this route resolves or\ncreates the corresponding Manga and Chapter rows, then delegates to\nthe query layer which works purely with UUIDs.",
-        "operationId": "update_history_manga_history_upsert_post",
+        "summary": "Upsert History",
+        "operationId": "upsert_history_manga_history_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1942,121 +2038,6 @@
             "OAuth2PasswordBearer": []
           }
         ]
-      }
-    },
-    "/manga/history/{user_id}": {
-      "get": {
-        "tags": [
-          "Manga"
-        ],
-        "summary": "Read User History",
-        "description": "Returns the user's reading history, enriched with manga name/cover\nand chapter title/num — most recently updated first.",
-        "operationId": "read_user_history_manga_history__user_id__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ReadHistoryResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Read User History Manga History  User Id  Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/manga/ocr_data": {
-      "get": {
-        "tags": [
-          "Manga"
-        ],
-        "summary": "Get Ocr Data",
-        "operationId": "get_ocr_data_manga_ocr_data_get",
-        "parameters": [
-          {
-            "name": "chapter_url",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chapter Url"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OCRResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/manga/ocr_data/stream": {
-      "get": {
-        "tags": [
-          "Manga"
-        ],
-        "summary": "Get Ocr Data Stream",
-        "operationId": "get_ocr_data_stream_manga_ocr_data_stream_get",
-        "parameters": [
-          {
-            "name": "chapter_url",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chapter Url"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     }
   },
@@ -2340,28 +2321,48 @@
         ],
         "title": "ChannelPreview"
       },
-      "ChapterInfo": {
+      "ChapterPreview": {
         "properties": {
-          "num": {
+          "id": {
             "type": "string",
-            "title": "Num"
+            "format": "uuid",
+            "title": "Id"
           },
           "title": {
             "type": "string",
             "title": "Title"
           },
-          "url": {
-            "type": "string",
-            "title": "Url"
+          "chapter_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Index"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
           }
         },
         "type": "object",
         "required": [
-          "num",
+          "id",
           "title",
-          "url"
+          "chapter_index",
+          "date"
         ],
-        "title": "ChapterInfo"
+        "title": "ChapterPreview"
       },
       "DailyStatResponse": {
         "properties": {
@@ -2635,28 +2636,123 @@
         ],
         "title": "KanjiResponse"
       },
-      "MangaInfo": {
+      "MangaDetail": {
         "properties": {
-          "name": {
+          "id": {
             "type": "string",
-            "title": "Name"
+            "format": "uuid",
+            "title": "Id"
           },
-          "cover_url": {
+          "title": {
             "type": "string",
-            "title": "Cover Url"
+            "title": "Title"
           },
-          "manga_url": {
-            "type": "string",
-            "title": "Manga Url"
+          "cover": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "genres": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genres"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterPreview"
+            },
+            "type": "array",
+            "title": "Chapters"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "cover_url",
-          "manga_url"
+          "id",
+          "title",
+          "cover",
+          "status",
+          "description",
+          "genres",
+          "chapters"
         ],
-        "title": "MangaInfo"
+        "title": "MangaDetail"
+      },
+      "MangaPreview": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "cover",
+          "status"
+        ],
+        "title": "MangaPreview"
       },
       "OCRBlock": {
         "properties": {
@@ -2753,6 +2849,71 @@
         ],
         "title": "OCRResponse"
       },
+      "OCRResultResponse": {
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chapter Id"
+          },
+          "ocr_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ocr Date"
+          },
+          "ocr_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OCRUserInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manga": {
+            "$ref": "#/components/schemas/MangaPreview"
+          },
+          "ocr_data": {
+            "$ref": "#/components/schemas/OCRResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "ocr_date",
+          "ocr_by",
+          "manga",
+          "ocr_data"
+        ],
+        "title": "OCRResultResponse"
+      },
+      "OCRUserInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "title": "OCRUserInfo"
+      },
       "OverviewStatsResponse": {
         "properties": {
           "total_decks": {
@@ -2833,11 +2994,6 @@
             "format": "uuid",
             "title": "Id"
           },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          },
           "current_page": {
             "type": "integer",
             "title": "Current Page"
@@ -2852,110 +3008,62 @@
             "format": "uuid",
             "title": "Manga Id"
           },
-          "manga_url": {
+          "manga_title": {
             "type": "string",
-            "title": "Manga Url"
+            "title": "Manga Title"
           },
-          "manga_name": {
-            "type": "string",
-            "title": "Manga Name"
-          },
-          "manga_cover_url": {
-            "type": "string",
-            "title": "Manga Cover Url"
+          "manga_cover": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manga Cover"
           },
           "chapter_id": {
             "type": "string",
             "format": "uuid",
             "title": "Chapter Id"
           },
-          "chapter_url": {
-            "type": "string",
-            "title": "Chapter Url"
-          },
-          "chapter_title": {
-            "type": "string",
-            "title": "Chapter Title"
-          },
-          "chapter_num": {
-            "type": "string",
-            "title": "Chapter Num"
+          "chapter_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Index"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "user_id",
           "current_page",
           "updated_at",
           "manga_id",
-          "manga_url",
-          "manga_name",
-          "manga_cover_url",
+          "manga_title",
+          "manga_cover",
           "chapter_id",
-          "chapter_url",
-          "chapter_title",
-          "chapter_num"
+          "chapter_index"
         ],
         "title": "ReadHistoryResponse"
       },
       "ReadHistoryUpdate": {
         "properties": {
-          "manga_url": {
+          "manga_id": {
             "type": "string",
-            "title": "Manga Url"
+            "format": "uuid",
+            "title": "Manga Id"
           },
-          "manga_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Manga Name",
-            "default": ""
-          },
-          "manga_cover_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Manga Cover Url",
-            "default": ""
-          },
-          "chapter_url": {
+          "chapter_id": {
             "type": "string",
-            "title": "Chapter Url"
-          },
-          "chapter_title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chapter Title",
-            "default": ""
-          },
-          "chapter_num": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chapter Num",
-            "default": ""
+            "format": "uuid",
+            "title": "Chapter Id"
           },
           "current_page": {
             "type": "integer",
@@ -2965,11 +3073,42 @@
         },
         "type": "object",
         "required": [
-          "manga_url",
-          "chapter_url"
+          "manga_id",
+          "chapter_id"
         ],
-        "title": "ReadHistoryUpdate",
-        "description": "Callers send human-readable URLs; the route resolves them to DB IDs.\nmanga_name and cover_url are used to create the Manga row if it doesn't\nexist yet (they are optional — existing rows won't be overwritten)."
+        "title": "ReadHistoryUpdate"
+      },
+      "ReadResponse": {
+        "properties": {
+          "manga": {
+            "$ref": "#/components/schemas/MangaPreview"
+          },
+          "chapter": {
+            "$ref": "#/components/schemas/ChapterPreview"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterPreview"
+            },
+            "type": "array",
+            "title": "Chapters"
+          },
+          "pages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manga",
+          "chapter",
+          "chapters",
+          "pages"
+        ],
+        "title": "ReadResponse"
       },
       "RegisterRequest": {
         "properties": {
@@ -3683,9 +3822,7 @@
         "type": "oauth2",
         "flows": {
           "password": {
-            "scopes": {
-
-            },
+            "scopes": {},
             "tokenUrl": "token"
           }
         }
