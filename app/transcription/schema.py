@@ -19,29 +19,6 @@ class TranscriptStatus(Enum):
     Finish = 3
 
 
-class Transcript(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
-
-    id: UUID = Field(primary_key=True, default_factory=uuid4)
-    original_source: str = Field(default=SupportedSite.FileUpload)
-    resource_id: str | None = Field(default=None, index=True)
-    resource_url: str = Field()
-    thumnail_url: str = Field()
-    name: str = Field()
-    date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    data: str | None = Field(default=None)
-    status: int = Field(default=TranscriptStatus.Uploading.value, index=True)
-    public: bool = Field(default=True)
-
-
-class TranscriptionHistory(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
-
-    id: UUID = Field(primary_key=True, default_factory=uuid4)
-    user_id : UUID = Field(foreign_key="user.id") 
-    transcript_id: UUID = Field(foreign_key="transcript.id", index=True)
-    date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 

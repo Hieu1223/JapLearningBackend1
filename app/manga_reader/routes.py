@@ -1,245 +1,145 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
-from pydantic import BaseModel
 
 from ..database import SessionDep
-from .rawkuma_extractor import NatsuExtractor
-from .manga_ocr import do_ocr,do_ocr_stream
-from .schema import MangaInfo, ChapterInfo, OCRResponse
-from .sort_type import SortType
-from ..database.manga_reader.queries import (
-    upsert_read_history_query,
-    get_read_histories,
-    get_or_create_manga,
-    get_or_create_chapter,
-    get_manga_with_url
-)
 from ..security.auth import CurrentUser
-import json
+from .schema import (
+    MangaPreview,
+    MangaDetail,
+    ReadResponse,
+    OCRResultResponse,
+    ReadHistoryUpdate,
+    ReadHistoryResponse,
+)
+from .controller import (
+    ctrl_get_manga_list,
+    ctrl_get_manga_detail,
+    ctrl_read_chapter,
+    ctrl_get_existing_ocr,
+    ctrl_stream_ocr,
+    ctrl_get_history,
+    ctrl_upsert_history,
+)
+
 router = APIRouter(tags=["Manga"])
 
 
-# ── Pydantic I/O models ───────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# MANGA LIST / SEARCH
+# ─────────────────────────────────────────────────────────────
 
-class ReadHistoryUpdate(BaseModel):
-    """
-    Callers send human-readable URLs; the route resolves them to DB IDs.
-    manga_name and cover_url are used to create the Manga row if it doesn't
-    exist yet (they are optional — existing rows won't be overwritten).
-    """
-    manga_url: str
-    manga_name: Optional[str] = ""
-    manga_cover_url: Optional[str] = ""
-    chapter_url: str
-    chapter_title: Optional[str] = ""
-    chapter_num: Optional[str] = ""
-    current_page: int = 0
-
-
-class ReadHistoryResponse(BaseModel):
-    id: UUID
-    user_id: UUID
-    current_page: int
-    updated_at: datetime
-
-    # Manga
-    manga_id: UUID
-    manga_url: str
-    manga_name: str
-    manga_cover_url: str
-
-    # Chapter
-    chapter_id: UUID
-    chapter_url: str
-    chapter_title: str
-    chapter_num: str
-
-    class Config:
-        from_attributes = True
-
-
-# ── Search ────────────────────────────────────────────────────────────────────
-
-@router.get("/search")
-async def search_manga(
+@router.get("/manga", response_model=list[MangaPreview])
+async def list_manga(
     session: SessionDep,
-    query: Optional[str] = "%20",
-    page: int = Query(1, ge=1),
-    sort: SortType = Query("recently_updated"),
-) -> list[MangaInfo]:
-    if not query:
-        raise HTTPException(status_code=400, detail="Query is required")
+    q: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    return ctrl_get_manga_list(session, query=q, limit=limit, offset=offset)
 
-    query_clean = query.strip()
+
+# ─────────────────────────────────────────────────────────────
+# AGGREGATE MANGA (detail + chapter list)
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/manga/{manga_id}", response_model=MangaDetail)
+async def get_manga(
+    manga_id: UUID,
+    session: SessionDep,
+):
+    result = ctrl_get_manga_detail(session, manga_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Manga not found")
+    return result
+
+
+# ─────────────────────────────────────────────────────────────
+# READ CHAPTER
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/read/{chapter_id}", response_model=ReadResponse)
+async def read_chapter(
+    chapter_id: UUID,
+    session: SessionDep,
+):
+    result = ctrl_read_chapter(session, chapter_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    return result
+
+
+# ─────────────────────────────────────────────────────────────
+# OCR
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/ocr/{chapter_id}", response_model=OCRResultResponse)
+async def get_ocr(
+    chapter_id: UUID,
+    session: SessionDep,
+    user: CurrentUser,
+):
+    result = ctrl_get_existing_ocr(session, chapter_id)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="No OCR result found. Use /ocr/stream/{chapter_id} to run OCR.",
+        )
+    return result
+
+
+@router.get("/ocr/stream/{chapter_id}")
+async def stream_ocr(
+    chapter_id: UUID,
+    session: SessionDep,
+    user: CurrentUser,
+    background_tasks: BackgroundTasks,
+):
+    if ctrl_get_existing_ocr(session, chapter_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Chapter already OCR'd. Fetch the result via GET /ocr/{chapter_id}.",
+        )
 
     try:
-        natsu = NatsuExtractor(session)
-        results = natsu.search(query=query_clean, page=page, sort=sort)
-        print(results)
-        return results
-    except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"error: {str(e)}"
-                ),
-            )
+        return StreamingResponse(
+            ctrl_stream_ocr(session, chapter_id, user, background_tasks),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
-# ── Chapter list ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# HISTORY
+# ─────────────────────────────────────────────────────────────
 
-@router.get("/chapter_list")
-async def get_chapter_list(
+@router.get("/history", response_model=list[ReadHistoryResponse])
+async def get_history(
     session: SessionDep,
-    manga_url: str,
-) -> list[ChapterInfo]:
-    if not manga_url:
-        raise HTTPException(status_code=400, detail="manga_url is required")
-
-    try:
-        natsu = NatsuExtractor(session)
-        return natsu.get_chapter_list(manga_url)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    user: CurrentUser,
+):
+    return ctrl_get_history(session, user)
 
 
-# ── Read (page images) ────────────────────────────────────────────────────────
-
-@router.get("/read")
-async def get_images(
-    session: SessionDep,
-    chapter_url: str,
-) -> list[str]:
-    if not chapter_url:
-        raise HTTPException(status_code=400, detail="chapter_url is required")
-
-    try:
-        natsu = NatsuExtractor(session)
-        return natsu.get_page_images(chapter_url)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── History ───────────────────────────────────────────────────────────────────
-
-@router.post("/history/upsert", response_model=ReadHistoryResponse)
-async def update_history(
+@router.post("/history", response_model=ReadHistoryResponse)
+async def upsert_history(
     data: ReadHistoryUpdate,
     session: SessionDep,
-    user_id: CurrentUser,
+    user: CurrentUser,
 ):
-    """
-    Upsert a reading-progress record.
-
-    The client sends URLs (which it already has); this route resolves or
-    creates the corresponding Manga and Chapter rows, then delegates to
-    the query layer which works purely with UUIDs.
-    """
     try:
-        print(data)
-        manga = get_manga_with_url(session,data.manga_url)
-        chapter = get_or_create_chapter(
+        return ctrl_upsert_history(
             session,
-            chapter_url=data.chapter_url,
-            title=data.chapter_title or "",
-            num=data.chapter_num or "",
-        )
-
-        history = upsert_read_history_query(
-            session=session,
-            user_id=user_id,
-            manga_id=manga.id,
-            chapter_id=chapter.id,
+            user_id=user,
+            manga_id=data.manga_id,
+            chapter_id=data.chapter_id,
             current_page=data.current_page,
         )
-
-        return ReadHistoryResponse(
-            id=history.id,
-            user_id=history.user_id,
-            current_page=history.current_page,
-            updated_at=history.updated_at,
-            manga_id=manga.id,
-            manga_url=manga.manga_url,
-            manga_name=manga.name,
-            manga_cover_url=manga.manga_cover_url,
-            chapter_id=chapter.id,
-            chapter_url=chapter.link,
-            chapter_title=chapter.title,
-            chapter_num=chapter.num,
-        )
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/history/{user_id}", response_model=list[ReadHistoryResponse])
-async def read_user_history(user_id: CurrentUser, session: SessionDep):
-    """
-    Returns the user's reading history, enriched with manga name/cover
-    and chapter title/num — most recently updated first.
-    """
-    rows = get_read_histories(session, user_id)
-    return [
-        ReadHistoryResponse(
-            id=row.id,
-            user_id=row.user_id,
-            current_page=row.current_page,
-            updated_at=row.updated_at,
-            manga_id=row.manga_id,
-            manga_url=row.manga_url,
-            manga_name=row.manga_name,
-            manga_cover_url=row.manga_cover_url,
-            chapter_id=row.chapter_id,
-            chapter_url=row.chapter_url,
-            chapter_title=row.chapter_title,
-            chapter_num=row.chapter_num,
-        )
-        for row in rows
-    ]
-
-
-# ── OCR ───────────────────────────────────────────────────────────────────────
-
-@router.get("/ocr_data")
-async def get_ocr_data(
-    session: SessionDep,
-    chapter_url: str,
-) -> OCRResponse:
-    if not chapter_url:
-        raise HTTPException(status_code=400, detail="chapter_url is required")
-
-    try:
-        data = await do_ocr(session, chapter_url)
-        return OCRResponse(pages=data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-
-@router.get("/ocr_data/stream")
-async def get_ocr_data_stream(
-    session: SessionDep,
-    chapter_url: str,
-):
-    if not chapter_url:
-        raise HTTPException(status_code=400, detail="chapter_url is required")
-
-    async def event_generator():
-        try:
-            async for page in do_ocr_stream(session, chapter_url):
-                yield f"data: {json.dumps(page)}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        finally:
-            yield "data: [DONE]\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disables buffering in nginx
-        },
-    )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

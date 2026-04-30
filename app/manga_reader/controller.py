@@ -1,0 +1,256 @@
+import json
+from uuid import UUID
+from typing import Optional, AsyncIterator
+from sqlmodel import Session
+from fastapi import BackgroundTasks
+
+from ..database.manga_reader.queries import (
+    get_manga_list,
+    search_manga,
+    get_manga_by_id,
+    get_chapter_by_id,
+    get_chapters_for_manga,
+    get_ocr_result_with_user,
+    save_ocr_result,
+    get_read_histories,
+    upsert_read_history,
+)
+from .schema import (
+    OCRResponse,
+    MangaPreview,
+    MangaDetail,
+    ChapterPreview,
+    ReadResponse,
+    OCRResultResponse,
+    OCRUserInfo,
+    ReadHistoryResponse,
+)
+from .manga_ocr import do_ocr_stream
+
+
+# ─────────────────────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────────────────────
+
+def _manga_preview(manga) -> MangaPreview:
+    return MangaPreview(
+        id=manga.id,
+        title=manga.title,
+        cover=manga.cover,
+        status=manga.status,
+    )
+
+
+def _chapter_preview(chapter) -> ChapterPreview:
+    return ChapterPreview(
+        id=chapter.id,
+        title=chapter.title,
+        chapter_index=chapter.chapter_index,
+        date=chapter.date,
+    )
+
+
+def _expand_pages_to_urls(payload: dict) -> list[str]:
+    """
+    Expands a stored pages payload back into a flat list of image URLs
+    for use by the OCR layer.
+    """
+    t = payload.get("type")
+
+    if t == "direct":
+        return payload.get("images", [])
+
+    if t == "template":
+        base_url = payload["base_url"]
+        page_count = payload["page_count"]
+        pattern = payload["pattern"]
+        return [f"{base_url}{pattern.format(i)}" for i in range(1, page_count + 1)]
+
+    return []  # "empty"
+
+
+# ─────────────────────────────────────────────────────────────
+# MANGA LIST / SEARCH
+# ─────────────────────────────────────────────────────────────
+
+def ctrl_get_manga_list(
+    session: Session,
+    query: Optional[str],
+    limit: int,
+    offset: int,
+) -> list[MangaPreview]:
+    if query:
+        mangas = search_manga(session, query, limit, offset)
+    else:
+        mangas = get_manga_list(session, limit, offset)
+    return [_manga_preview(m) for m in mangas]
+
+
+# ─────────────────────────────────────────────────────────────
+# AGGREGATE MANGA (detail + chapter list)
+# ─────────────────────────────────────────────────────────────
+
+def ctrl_get_manga_detail(session: Session, manga_id: UUID) -> Optional[MangaDetail]:
+    manga = get_manga_by_id(session, manga_id)
+    if not manga:
+        return None
+
+    chapters = get_chapters_for_manga(session, manga_id)
+
+    return MangaDetail(
+        id=manga.id,
+        title=manga.title,
+        cover=manga.cover,
+        status=manga.status,
+        description=manga.description,
+        genres=manga.genres,
+        chapters=[_chapter_preview(c) for c in chapters],
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# READ
+# ─────────────────────────────────────────────────────────────
+
+def ctrl_read_chapter(session: Session, chapter_id: UUID) -> Optional[ReadResponse]:
+    chapter = get_chapter_by_id(session, chapter_id)
+    if not chapter:
+        return None
+
+    manga = get_manga_by_id(session, chapter.manga_id)
+    if not manga:
+        return None
+
+    chapters = get_chapters_for_manga(session, manga.id)
+
+    # expand the stored payload dict into a flat list of URLs
+    payload = json.loads(chapter.pages) if chapter.pages else {"type": "empty"}
+    pages = _expand_pages_to_urls(payload)
+
+    return ReadResponse(
+        manga=_manga_preview(manga),
+        chapter=_chapter_preview(chapter),
+        chapters=[_chapter_preview(c) for c in chapters],
+        pages=pages,
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# OCR
+# ─────────────────────────────────────────────────────────────
+
+def ctrl_get_existing_ocr(
+    session: Session,
+    chapter_id: UUID,
+) -> Optional[OCRResultResponse]:
+    row = get_ocr_result_with_user(session, chapter_id)
+    if not row:
+        return None
+
+    ocr_result, user = row
+
+    chapter = get_chapter_by_id(session, chapter_id)
+    if not chapter:
+        return None
+
+    manga = get_manga_by_id(session, chapter.manga_id)
+    if not manga:
+        return None
+
+    return OCRResultResponse(
+        chapter_id=chapter_id,
+        ocr_date=ocr_result.ocr_date,
+        ocr_by=OCRUserInfo(id=user.id, display_name=user.display_name) if user else None,
+        manga=_manga_preview(manga),
+        ocr_data=OCRResponse.model_validate(json.loads(ocr_result.ocr_data)),
+    )
+
+
+async def ctrl_stream_ocr(
+    session: Session,
+    chapter_id: UUID,
+    user_id: UUID,
+    background_tasks: BackgroundTasks,
+) -> AsyncIterator[str]:
+    """
+    Expands the stored pages payload into image URLs, streams OCR
+    page-by-page as SSE events, and saves to DB via a background task
+    so the save completes even if the client disconnects early.
+    """
+    chapter = get_chapter_by_id(session, chapter_id)
+    if not chapter or not chapter.pages:
+        raise ValueError("Chapter has no pages to OCR")
+
+    payload = json.loads(chapter.pages)
+    image_urls = _expand_pages_to_urls(payload)
+
+    if not image_urls:
+        raise ValueError("Chapter has no pages to OCR")
+
+    accumulated: list[dict] = []
+
+    def _save_to_db():
+        save_ocr_result(
+            session,
+            chapter_id=chapter_id,
+            ocr_data=json.dumps({"pages": accumulated}),
+            ocr_by=user_id,
+        )
+
+    background_tasks.add_task(_save_to_db)
+
+    async for page in do_ocr_stream(image_urls):
+        accumulated.append(page)
+        yield f"data: {json.dumps(page)}\n\n"
+
+    yield "data: [DONE]\n\n"
+
+
+# ─────────────────────────────────────────────────────────────
+# HISTORY
+# ─────────────────────────────────────────────────────────────
+
+def ctrl_get_history(session: Session, user_id: UUID) -> list[ReadHistoryResponse]:
+    rows = get_read_histories(session, user_id)
+    return [
+        ReadHistoryResponse(
+            id=row.id,
+            current_page=row.current_page,
+            updated_at=row.updated_at,
+            manga_id=row.manga_id,
+            manga_title=row.manga_title,
+            manga_cover=row.manga_cover,
+            chapter_id=row.chapter_id,
+            chapter_index=row.chapter_index,
+        )
+        for row in rows
+    ]
+
+
+def ctrl_upsert_history(
+    session: Session,
+    user_id: UUID,
+    manga_id: UUID,
+    chapter_id: UUID,
+    current_page: int,
+) -> ReadHistoryResponse:
+    manga = get_manga_by_id(session, manga_id)
+    if not manga:
+        raise ValueError("Manga not found")
+
+    chapter = get_chapter_by_id(session, chapter_id)
+    if not chapter:
+        raise ValueError("Chapter not found")
+
+    history = upsert_read_history(session, user_id, manga_id, chapter_id, current_page)
+
+    return ReadHistoryResponse(
+        id=history.id,
+        current_page=history.current_page,
+        updated_at=history.updated_at,
+        manga_id=manga.id,
+        manga_title=manga.title,
+        manga_cover=manga.cover,
+        chapter_id=chapter.id,
+        chapter_index=chapter.chapter_index,
+    )
