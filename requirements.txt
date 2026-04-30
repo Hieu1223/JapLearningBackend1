@@ -52,7 +52,7 @@ shellingham==1.5.4
 SQLAlchemy==2.0.49
 sqlmodel==0.0.38
 starlette==1.0.0
-SudachiDict-small==20260116
+SudachiDict-full
 SudachiPy==0.6.10
 synchronicity==0.12.2
 toml==0.10.2

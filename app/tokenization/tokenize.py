@@ -8,7 +8,7 @@ from ..database import get_session
 from ..database.dictionary.queries import look_up_word_exact
 from .schema import Token, WordEntry
 
-tokenizer_obj = dictionary.Dictionary(dict="small").create()
+tokenizer_obj = dictionary.Dictionary(dict="full").create()
 mode = tokenizer.Tokenizer.SplitMode.C
 
 
