@@ -4,7 +4,7 @@ from typing import Annotated
 from ..security import scheme
 from .schema import TokenList ,KanjiResponse,WordResponse
 from .tokenize import tokenize, Token
-from ..database.db import get_session, Session
+from ..database.db import get_session, Session,SessionDep
 from ..database.dictionary.queries import look_up_kanji, get_words_for_kanji,look_up_kanji_by_reading
 from fastapi import HTTPException
 from typing import List
@@ -15,11 +15,11 @@ router = APIRouter(tags=["tokenization"])
 @router.get("/tokenize", response_model=TokenList)
 async def tokenize_endpoint(
     text: Annotated[str, Query(..., min_length=1)],
-    tokens: list[Token] = Depends(tokenize),
+    session: SessionDep,
     token=Depends(scheme),
 ):
+    tokens = await tokenize(session,text)
     return TokenList(tokens=tokens)
-
 
 
 @router.get("/kanji/{kanji}", response_model=KanjiResponse)

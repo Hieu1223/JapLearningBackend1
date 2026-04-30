@@ -22,7 +22,7 @@ from .schema import (
     PublicDeckResponse,
     WordResponse,
 )
-from ..database.dictionary.queries import look_up_words, look_up_word_exact
+from ..tokenization.tokenize import get_or_fetch_words
 
 router = APIRouter()
 
@@ -32,13 +32,13 @@ router = APIRouter()
 # =========================================================
 
 @router.get("/words/search", response_model=List[WordResponse])
-def search_words(
+async def search_words(
     q: str = Query(..., min_length=1),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
 ):
     """Full-text search across word, reading, and meaning."""
-    return look_up_words(session, q, limit)
+    return await get_or_fetch_words(session, q)
 
 
 # =========================================================
