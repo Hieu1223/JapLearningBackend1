@@ -71,3 +71,4 @@ PyJWT
 bcrypt
 numpy
 yt-dlp
+jaconv
