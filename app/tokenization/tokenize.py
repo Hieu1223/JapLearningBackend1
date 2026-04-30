@@ -40,16 +40,17 @@ async def get_or_fetch_words(session: Session, reading: str,dict_form:str) -> Li
     # 1. Logic kiểm tra và chuyển đổi
     else:
         search_query = dict_form
-    
+    print(reading,dict_form,search_query)
     # 2. Kiểm tra DB Cache
-    statement = select(Word).where(Word.reading == kata_reading and Word.word == dict_form)
+    statement = select(Word).where(Word.reading == kata_reading , Word.word == dict_form)
     existing_words = session.exec(statement).all()
-    
-    if existing_words:
-        return existing_words
+    print(existing_words)
 
+    if existing_words:
+        return 
     # 3. Gọi API nếu DB chưa có
     api_results = await fetch_api_suggestions(client, search_query)
+    print(api_results)
     if not api_results:
         return []
 
