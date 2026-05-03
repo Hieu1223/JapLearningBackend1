@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
-
 from ..database import SessionDep
 from ..security.auth import CurrentUser
 from .schema import (
@@ -21,6 +20,7 @@ from .controller import (
     ctrl_stream_ocr,
     ctrl_get_history,
     ctrl_upsert_history,
+    ctr_delete_history
 )
 
 router = APIRouter(tags=["Manga"])
@@ -143,3 +143,13 @@ async def upsert_history(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+def delete_read_history_by_id(
+    session: SessionDep,
+    history_id: UUID,
+    user_id: CurrentUser,
+) -> bool:
+    
+    ctr_delete_history(session,user_id,history_id)
+    session.commit()
+    return True

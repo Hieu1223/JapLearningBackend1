@@ -14,6 +14,7 @@ from ..database.manga_reader.queries import (
     save_ocr_result,
     get_read_histories,
     upsert_read_history,
+    delete_read_history
 )
 from .schema import (
     OCRResponse,
@@ -254,3 +255,6 @@ def ctrl_upsert_history(
         chapter_id=chapter.id,
         chapter_index=chapter.chapter_index,
     )
+
+def ctr_delete_history(session: Session, user_id: UUID, manga_id : UUID):
+    delete_read_history(session,user_id,manga_id)

@@ -243,3 +243,21 @@ def upsert_read_history(
     session.commit()
     session.refresh(history)
     return history
+
+def delete_read_history(
+    session: Session,
+    user_id: UUID,
+    manga_id: UUID,
+) -> bool:
+    stmt = select(ReadHistory).where(
+        ReadHistory.user_id == user_id,
+        ReadHistory.manga_id == manga_id,
+    )
+    history = session.exec(stmt).first()
+
+    if not history:
+        return False
+
+    session.delete(history)
+    session.commit()
+    return True
