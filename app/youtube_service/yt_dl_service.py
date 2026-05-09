@@ -36,9 +36,8 @@ def search_youtube(query: str, limit: int = 10) -> List[VideoPreview]:
             continue
         try:
             results.append(VideoPreview.fromYtdlFlatJson(entry))
-        except Exception as e:
-            raise HTTPException(501, e)
-            continue
+        except Exception:
+            continue  # skip malformed entries silently
 
     return results
 
