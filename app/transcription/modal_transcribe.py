@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from fastapi import File
 # Look up deployed class
-Transcriber = modal.Cls.from_name("whisperx_transcribe", "Transcriber")
+Transcriber = modal.Cls.from_name("qwen_transcribe", "QwenTranscriber")
 transcriber = Transcriber()
 
 
