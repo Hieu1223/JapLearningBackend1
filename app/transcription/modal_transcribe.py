@@ -1,9 +1,8 @@
 import os
 import modal
 
-QwenPipeline = modal.Cls.from_name("qwen_transcribe", "QwenPipeline")
-pipeline = QwenPipeline()
-
+WhisperXTranscriber = modal.Cls.from_name("whisperx_transcribe", "WhisperXTranscriber")
+pipeline = WhisperXTranscriber()
 PROXY = os.environ.get("HTTP_PROXY")
 
 
