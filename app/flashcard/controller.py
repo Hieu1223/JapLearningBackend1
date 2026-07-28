@@ -20,25 +20,16 @@ from .schema import (
     DailyStatResponse,
     OverviewStatsResponse,
     PublicDeckResponse,
-    WordResponse,
     db_state_to_card_state,
 )
 
 
-# =========================================================
-# HELPERS
-# =========================================================
-
-def _card_to_response(card: Card, word) -> CardResponse:
+def _card_to_response(card: Card) -> CardResponse:
     return CardResponse(
         id=card.id,
         deck_id=card.deck_id,
-        word=WordResponse(
-            id=word.id,
-            word=word.word,
-            reading=word.reading,
-            meaning=word.meaning,
-        ),
+        front=card.front,
+        back=card.back,
         state=db_state_to_card_state(State(card.state)),
         step=card.step,
         stability=card.stability,
@@ -48,15 +39,7 @@ def _card_to_response(card: Card, word) -> CardResponse:
     )
 
 
-# =========================================================
-# FSRS-STYLE SRS ALGORITHM
-# =========================================================
-
 def _apply_srs(card: Card, rating: int) -> Card:
-    """
-    rating: 1=Again  2=Hard  3=Good  4=Easy
-    Mutates card in-place and returns it.
-    """
     now = datetime.utcnow()
     card.last_review = now
 
@@ -65,12 +48,12 @@ def _apply_srs(card: Card, rating: int) -> Card:
         card.step = 0
 
     if card.state in (State.Learning, State.Relearning):
-        if rating == 1:       # Again
+        if rating == 1:
             card.step = 0
             card.due = now + timedelta(minutes=1)
-        elif rating == 2:     # Hard
+        elif rating == 2:
             card.due = now + timedelta(minutes=5)
-        elif rating == 3:     # Good
+        elif rating == 3:
             card.step = (card.step or 0) + 1
             if card.step >= 2:
                 card.state = State.Review
@@ -79,14 +62,14 @@ def _apply_srs(card: Card, rating: int) -> Card:
                 card.due = now + timedelta(days=max(1, int(card.stability)))
             else:
                 card.due = now + timedelta(minutes=10)
-        else:                 # Easy
+        else:
             card.state = State.Review
             card.stability = (card.stability or 1.0) * 2
             card.difficulty = max(1.0, (card.difficulty or 5.0) - 0.5)
             card.due = now + timedelta(days=max(1, int(card.stability)))
 
     elif card.state == State.Review:
-        if rating == 1:       # Again — lapse
+        if rating == 1:
             card.state = State.Relearning
             card.step = 0
             card.stability = max(1.0, (card.stability or 1.0) * 0.5)
@@ -101,13 +84,7 @@ def _apply_srs(card: Card, rating: int) -> Card:
     return card
 
 
-# =========================================================
-# FLASHCARD CONTROLLER
-# =========================================================
-
 class FlashcardController:
-
-    # ----- Decks -----
 
     @staticmethod
     def create_deck(session: Session, user_id: UUID, name: str, public: bool = False) -> DeckWithStatsResponse:
@@ -120,7 +97,7 @@ class FlashcardController:
     @staticmethod
     def update_deck(session: Session, user_id: UUID, deck_id: UUID, name: str) -> Optional[DeckResponse]:
         deck = q.update_deck(session, user_id, deck_id, name)
-        return deck  # ORM model; FastAPI serialises via from_attributes
+        return deck
 
     @staticmethod
     def delete_deck(session: Session, user_id: UUID, deck_id: UUID) -> bool:
@@ -164,22 +141,23 @@ class FlashcardController:
             stats=DeckStatsResponse(new=q.get_deck_progress_stats(session, deck.id)["new"]),
         )
 
-    # ----- Cards -----
-
     @staticmethod
     def list_cards(session: Session, deck_id: UUID) -> List[CardResponse]:
-        return [_card_to_response(card, word) for card, word in q.get_cards_by_deck(session, deck_id)]
+        return [_card_to_response(card) for card in q.get_cards_by_deck(session, deck_id)]
 
     @staticmethod
-    def add_card(session: Session, user_id: UUID, deck_id: UUID, word_id: UUID) -> Optional[CardResponse]:
+    def add_card(
+        session: Session,
+        user_id: UUID,
+        deck_id: UUID,
+        front: str,
+        back: str,
+    ) -> Optional[CardResponse]:
         deck = q.get_deck_by_id(session, deck_id)
         if not deck or deck.owner_id != user_id:
             return None
-        result = q.add_card_to_deck(session, deck_id, word_id)
-        if not result:
-            return None
-        card, word = result
-        return _card_to_response(card, word)
+        card = q.add_card_to_deck(session, deck_id, front=front, back=back)
+        return _card_to_response(card)
 
     @staticmethod
     def delete_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
@@ -189,15 +167,12 @@ class FlashcardController:
     def reset_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
         return q.reset_card(session, user_id, card_id)
 
-    # ----- SRS -----
-
     @staticmethod
     def fetch_due_card(session: Session, deck_id: UUID) -> Optional[CardResponse]:
-        result = q.get_next_card(session, deck_id)
-        if not result:
+        card = q.get_next_card(session, deck_id)
+        if not card:
             return None
-        card, word = result
-        return _card_to_response(card, word)
+        return _card_to_response(card)
 
     @staticmethod
     def handle_review(
@@ -206,12 +181,10 @@ class FlashcardController:
         card_id: UUID,
         rating: int,
     ) -> Optional[CardResponse]:
-        result = q.get_card_by_id(session, card_id)
-        if not result:
+        card = q.get_card_by_id(session, card_id)
+        if not card:
             return None
-        card, word = result
 
-        # Verify ownership
         deck = q.get_deck_by_id(session, card.deck_id)
         if not deck or deck.owner_id != user_id:
             return None
@@ -243,9 +216,7 @@ class FlashcardController:
             rating=rating,
         )
 
-        return _card_to_response(updated, word)
-
-    # ----- Progress & Stats -----
+        return _card_to_response(updated)
 
     @staticmethod
     def get_deck_progress(session: Session, deck_id: UUID) -> DeckProgressResponse:

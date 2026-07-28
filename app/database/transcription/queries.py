@@ -1,9 +1,7 @@
-
 from .schema import *
 from sqlmodel import Session, SQLModel, create_engine, select
 import json
 from uuid import UUID
-
 
 
 def to_info(t: Transcript) -> TranscriptInfoResponse:
@@ -98,6 +96,7 @@ def check_exist_and_create_transcription_entry(
     """
     Idempotent: if resource exists, link to user history if not already linked.
     Otherwise, create Transcript and history entry.
+    Also updates existing visited video history entries with transcript_id.
     """
     transcript = None
 
@@ -119,53 +118,75 @@ def check_exist_and_create_transcription_entry(
         session.add(transcript)
         session.flush()  # Ensure transcript.id is available
 
-    # 3. Check if this specific user already has this in their history
-    history_exists = session.exec(
+    # 3. Check if this user has a history entry for this video (visited but not transcribed)
+    history_entry = session.exec(
         select(TranscriptionHistory).where(
             TranscriptionHistory.user_id == user_id,
-            TranscriptionHistory.transcript_id == transcript.id
+            TranscriptionHistory.resource_id == form.resource_id,
         )
     ).first()
 
-    # 4. If not in history, add it (Auto-link on request)
-    if not history_exists:
+    # 4. If history exists but transcript_id is NULL, update it with the transcript_id
+    if history_entry and history_entry.transcript_id is None:
+        history_entry.transcript_id = transcript.id
+        session.add(history_entry)
+        session.commit()
+    elif not history_entry:
+        # 5. If no history entry exists, create one
         history_entry = TranscriptionHistory(
             user_id=user_id,
-            transcript_id=transcript.id
+            transcript_id=transcript.id,
+            resource_id=form.resource_id,
+            name=form.name,
+            thumbnail_url=form.thumbnail_url,
+            original_source=form.original_source,
+            resource_url=form.resource_url,
         )
         session.add(history_entry)
+        session.commit()
 
-    session.commit()
     session.refresh(transcript)
     return to_info(transcript)
 
 
-
 def get_user_history(session: Session, user_id: UUID) -> UserHistoryListResponse:
     """
-    Joins TranscriptionHistory with Transcript to return metadata for a user's collection.
+    Returns user's history including both transcribed videos and visited videos.
+    Transcribed videos have transcript_id set, visited videos have transcript_id=NULL.
     """
-    statement = (
+    history_statement = (
         select(TranscriptionHistory, Transcript)
-        .join(Transcript, TranscriptionHistory.transcript_id == Transcript.id)
+        .outerjoin(Transcript, TranscriptionHistory.transcript_id == Transcript.id)
         .where(TranscriptionHistory.user_id == user_id)
         .order_by(TranscriptionHistory.date_created.desc())
     )
-    results = session.exec(statement).all()
-
-    history_items = [
-        UserHistoryResponse(
-            history_id=h.id,
-            transcript_id=t.id,
-            name=t.name,
-            thumbnail_url=t.thumnail_url,
-            original_source=t.original_source,
-            date_created=h.date_created,
-            status=t.status,
-        )
-        for h, t in results
-    ]
-
+    results = session.exec(history_statement).all()
+    
+    history_items = []
+    for h, t in results:
+        if t:
+            history_items.append(UserHistoryResponse(
+                history_id=h.id,
+                transcript_id=t.id,
+                name=t.name,
+                thumbnail_url=t.thumnail_url,
+                original_source=t.original_source,
+                date_created=h.date_created,
+                status=t.status,
+                is_transcribed=True,
+            ))
+        else:
+            history_items.append(UserHistoryResponse(
+                history_id=h.id,
+                transcript_id=None,
+                name=h.name,
+                thumbnail_url=h.thumbnail_url,
+                original_source=h.original_source,
+                date_created=h.date_created,
+                status=None,
+                is_transcribed=False,
+            ))
+    
     return UserHistoryListResponse(items=history_items, total=len(history_items))
 
 
@@ -174,16 +195,17 @@ def remove_history_entry(session: Session, history_id: UUID, user_id: UUID) -> b
     Removes a specific entry from a user's history. 
     Requires user_id to ensure ownership before deletion.
     """
-    statement = select(TranscriptionHistory).where(
-        TranscriptionHistory.id == history_id, 
-        TranscriptionHistory.user_id == user_id
-    )
-    entry = session.exec(statement).one_or_none()
+    history_entry = session.exec(
+        select(TranscriptionHistory).where(
+            TranscriptionHistory.id == history_id, 
+            TranscriptionHistory.user_id == user_id
+        )
+    ).one_or_none()
     
-    if not entry:
+    if not history_entry:
         return False
-        
-    session.delete(entry)
+    
+    session.delete(history_entry)
     session.commit()
     return True
 
@@ -195,6 +217,3 @@ def get_orphaned_transcriptions(session: Session):
 
     results = session.exec(stmt).all()
     return results
-
-
-

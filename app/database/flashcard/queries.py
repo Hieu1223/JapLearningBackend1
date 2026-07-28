@@ -4,16 +4,12 @@ database/flashcard/queries.py
 
 from uuid import UUID
 from datetime import datetime, timedelta
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 from sqlmodel import Session, select, func, case, col
 
 from .schema import Card, Deck, ReviewLog, State
-from ..dictionary.schema import Word, Kanji, WordKanjiReading
 
-# =========================================================
-# DECK
-# =========================================================
 
 def add_deck(session: Session, user_id: UUID, name: str, public: bool = False) -> Deck:
     deck = Deck(name=name, owner_id=user_id, public=public)
@@ -43,14 +39,11 @@ def update_deck(session: Session, user_id: UUID, deck_id: UUID, name: str) -> Op
 
 
 def delete_deck(session: Session, user_id: UUID, deck_id: UUID) -> bool:
-    """Deletes the deck and all its cards (including SR data and review logs)."""
     deck = session.get(Deck, deck_id)
     if not deck or deck.owner_id != user_id:
         return False
-    # Delete review logs for this deck first
     for log in session.exec(select(ReviewLog).where(ReviewLog.deck_id == deck_id)).all():
         session.delete(log)
-    # Delete all cards
     for card in session.exec(select(Card).where(Card.deck_id == deck_id)).all():
         session.delete(card)
     session.delete(deck)
@@ -58,30 +51,24 @@ def delete_deck(session: Session, user_id: UUID, deck_id: UUID) -> bool:
     return True
 
 
-def get_public_decks(session: Session) -> List[Tuple[Deck, int]]:
-    """Returns (Deck, card_count) for every public deck."""
+def get_public_decks(session: Session) -> List[tuple]:
     rows = session.exec(
         select(Deck, func.count(Card.id).label("card_count"))
         .outerjoin(Card, Card.deck_id == Deck.id)
-        .where(Deck.public == True)  # noqa: E712
+        .where(Deck.public == True)
         .group_by(Deck.id)
     ).all()
     return rows
 
 
 def copy_deck_for_user(session: Session, user_id: UUID, source_deck_id: UUID) -> Optional[Deck]:
-    """
-    Deep-copy a public deck into a new Deck owned by user_id.
-    Every Card is cloned with a fresh SR state.
-    Returns the new Deck, or None if the source doesn't exist / isn't public.
-    """
     source = session.get(Deck, source_deck_id)
     if not source or not source.public:
         return None
 
     new_deck = Deck(name=source.name, owner_id=user_id, public=False)
     session.add(new_deck)
-    session.flush()  # need new_deck.id before the card loop
+    session.flush()
 
     source_cards = session.exec(select(Card).where(Card.deck_id == source_deck_id)).all()
     now = datetime.utcnow()
@@ -89,6 +76,8 @@ def copy_deck_for_user(session: Session, user_id: UUID, source_deck_id: UUID) ->
         clone = Card(
             deck_id=new_deck.id,
             word_id=src_card.word_id,
+            front=src_card.front,
+            back=src_card.back,
             state=State.New,
             step=0,
             stability=None,
@@ -103,33 +92,21 @@ def copy_deck_for_user(session: Session, user_id: UUID, source_deck_id: UUID) ->
     return new_deck
 
 
-# =========================================================
-# CARD
-# =========================================================
-
-def get_cards_by_deck(session: Session, deck_id: UUID) -> List[Tuple[Card, Word]]:
-    """Returns (Card, Word) pairs for every card in the deck."""
+def get_cards_by_deck(session: Session, deck_id: UUID) -> List[Card]:
     return session.exec(
-        select(Card, Word)
-        .join(Word, Card.word_id == Word.id)
-        .where(Card.deck_id == deck_id)
+        select(Card).where(Card.deck_id == deck_id)
     ).all()
 
 
-def add_card_to_deck(session: Session, deck_id: UUID, word_id: UUID) -> Optional[Tuple[Card, Word]]:
-    """Add a word to a deck. Returns None if the word doesn't exist."""
-    word = session.get(Word, word_id)
-    if not word:
-        return None
-    card = Card(deck_id=deck_id, word_id=word_id)
+def add_card_to_deck(session: Session, deck_id: UUID, front: str, back: str) -> Card:
+    card = Card(deck_id=deck_id, front=front, back=back)
     session.add(card)
     session.commit()
     session.refresh(card)
-    return card, word
+    return card
 
 
 def delete_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
-    """Deck owner only. Also removes review logs for this card."""
     card = session.get(Card, card_id)
     if not card:
         return False
@@ -144,7 +121,6 @@ def delete_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
 
 
 def reset_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
-    """Reset a card's SR data back to New state (deck owner only)."""
     card = session.get(Card, card_id)
     if not card:
         return False
@@ -162,33 +138,15 @@ def reset_card(session: Session, user_id: UUID, card_id: UUID) -> bool:
     return True
 
 
-# =========================================================
-# SRS CORE
-# =========================================================
-
-def get_card_by_id(session: Session, card_id: UUID) -> Optional[Tuple[Card, Word]]:
-    result = session.exec(
-        select(Card, Word).join(Word, Card.word_id == Word.id).where(Card.id == card_id)
-    ).first()
-    return result
+def get_card_by_id(session: Session, card_id: UUID) -> Optional[Card]:
+    return session.get(Card, card_id)
 
 
-def get_next_card(session: Session, deck_id: UUID) -> Optional[Tuple[Card, Word]]:
-    """
-    Pick the next card to study from a deck.
-
-    Priority:
-      1. Due card with an existing non-New state (earliest due first).
-      2. Any New card (earliest created / lowest rowid).
-
-    Returns (Card, Word) or None when nothing is left to study.
-    """
+def get_next_card(session: Session, deck_id: UUID) -> Optional[Card]:
     now = datetime.utcnow()
 
-    # 1. Overdue non-new card
     due = session.exec(
-        select(Card, Word)
-        .join(Word, Card.word_id == Word.id)
+        select(Card)
         .where(Card.deck_id == deck_id)
         .where(Card.state != State.New)
         .where(Card.due <= now)
@@ -199,10 +157,8 @@ def get_next_card(session: Session, deck_id: UUID) -> Optional[Tuple[Card, Word]
     if due:
         return due
 
-    # 2. Any new card
     new = session.exec(
-        select(Card, Word)
-        .join(Word, Card.word_id == Word.id)
+        select(Card)
         .where(Card.deck_id == deck_id)
         .where(Card.state == State.New)
         .limit(1)
@@ -228,7 +184,7 @@ def write_review_log(
     user_id: UUID,
     card_id: UUID,
     deck_id: UUID,
-    word_id: UUID,
+    word_id: Optional[UUID],
     state_before: State,
     state_after: State,
     rating: int,
@@ -247,10 +203,6 @@ def write_review_log(
     session.refresh(log)
     return log
 
-
-# =========================================================
-# PROGRESS STATS — per deck
-# =========================================================
 
 def get_deck_progress_stats(session: Session, deck_id: UUID) -> dict:
     now = datetime.utcnow()
@@ -284,10 +236,6 @@ def get_deck_progress_stats(session: Session, deck_id: UUID) -> dict:
 
 
 def get_all_deck_stats_for_user(session: Session, user_id: UUID) -> dict:
-    """
-    Returns { deck_id: { new, learning, review, relearning, due, total } }
-    for every deck the user owns.
-    """
     now = datetime.utcnow()
 
     decks = session.exec(select(Deck).where(Deck.owner_id == user_id)).all()
@@ -299,7 +247,6 @@ def get_all_deck_stats_for_user(session: Session, user_id: UUID) -> dict:
         for d in decks
     }
 
-    # Total cards per deck
     for deck_id, cnt in session.exec(
         select(Card.deck_id, func.count(Card.id))
         .where(col(Card.deck_id).in_([d.id for d in decks]))
@@ -308,7 +255,6 @@ def get_all_deck_stats_for_user(session: Session, user_id: UUID) -> dict:
         if deck_id in result:
             result[deck_id]["total"] = cnt
 
-    # State counts per deck
     _map = {State.New: "new", State.Learning: "learning",
             State.Review: "review", State.Relearning: "relearning"}
     for deck_id, state, cnt in session.exec(
@@ -321,7 +267,6 @@ def get_all_deck_stats_for_user(session: Session, user_id: UUID) -> dict:
             if key:
                 result[deck_id][key] = cnt
 
-    # Due counts per deck (New cards are always due)
     for deck_id, due_cnt in session.exec(
         select(Card.deck_id, func.count(Card.id))
         .where(col(Card.deck_id).in_([d.id for d in decks]))
@@ -333,10 +278,6 @@ def get_all_deck_stats_for_user(session: Session, user_id: UUID) -> dict:
 
     return result
 
-
-# =========================================================
-# DAILY REVIEW STATS
-# =========================================================
 
 def get_daily_review_stats(session: Session, user_id: UUID, days: int) -> list:
     from datetime import timedelta
@@ -371,10 +312,6 @@ def get_daily_review_stats(session: Session, user_id: UUID, days: int) -> list:
         })
     return result
 
-
-# =========================================================
-# USER OVERVIEW STATS
-# =========================================================
 
 def get_user_overview_stats(session: Session, user_id: UUID) -> dict:
     now = datetime.utcnow()

@@ -2,18 +2,13 @@
 flashcard/schema.py  (API layer — Pydantic models)
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, Literal
 from enum import Enum
-from ..tokenization.schema import WordResponse
 from ..database.flashcard.schema import State
 
-
-# =========================================================
-# STATE ENUM (API layer)
-# =========================================================
 
 class CardState(str, Enum):
     NEW        = "new"
@@ -34,23 +29,16 @@ def db_state_to_card_state(state: State) -> CardState:
     return _STATE_MAP[int(state)]
 
 
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
 class AddCardRequest(BaseModel):
     deck_id: UUID
-    word_id: UUID
+    front: str = Field(..., min_length=1)
+    back: str = Field(..., min_length=1)
 
 
 class ReviewRequest(BaseModel):
     card_id: UUID
-    rating:  Literal["again", "hard", "good", "easy"]
+    rating: Literal["again", "hard", "good", "easy"]
 
-
-# =========================================================
-# DECK
-# =========================================================
 
 class DeckResponse(BaseModel):
     id:       UUID
@@ -97,15 +85,11 @@ class PublicDeckResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# =========================================================
-# CARD  (includes word data + SR state)
-# =========================================================
-
 class CardResponse(BaseModel):
     id:      UUID
     deck_id: UUID
-    word:    WordResponse   # joined from Word table
-
+    front:   str
+    back:    str
     state:       CardState
     step:        Optional[int]   = None
     stability:   Optional[float] = None
@@ -116,12 +100,8 @@ class CardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# =========================================================
-# STATISTICS
-# =========================================================
-
 class DailyStatResponse(BaseModel):
-    date:     str    # "YYYY-MM-DD"
+    date:     str
     total:    int
     correct:  int
     wrong:    int

@@ -17,6 +17,7 @@ class TranscriptStatus(Enum):
     InQueue = 1
     Transcripting = 2
     Finish = 3
+    Error = 4
 
 
 
@@ -44,7 +45,6 @@ class TranscriptStatusRequest(BaseModel):
     transcript_id : UUID
 
 
-
 class TranscriptStatusResponse(BaseModel):
     done: bool
     msg: str
@@ -60,8 +60,6 @@ class TranscriptInfoResponse(BaseModel):
     resource_url: str
     resource_id: str | None
     status: int
-
-
 
 
 class TokenTimestamp(BaseModel):
@@ -84,12 +82,13 @@ class ErrorMessage(BaseModel):
 
 class UserHistoryResponse(BaseModel):
     history_id: UUID
-    transcript_id: UUID
+    transcript_id: UUID | None
     name: str
     thumbnail_url: str
     original_source: str
     date_created: datetime
-    status: int
+    status: int | None = None
+    is_transcribed: bool = False
 
 class UserHistoryListResponse(BaseModel):
     items: list[UserHistoryResponse]
@@ -98,3 +97,15 @@ class UserHistoryListResponse(BaseModel):
 
 class RemoveHistoryRequest(BaseModel):
     history_id: UUID
+
+
+class TranscriptDetailResponse(BaseModel):
+    id: UUID
+    original_source: str
+    thumnail_url: str
+    resource_url: str
+    resource_id: str | None
+    status: int
+    done: bool
+    msg: str
+    data: TranscriptResult | None = None

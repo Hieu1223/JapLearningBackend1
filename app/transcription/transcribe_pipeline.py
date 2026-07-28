@@ -9,25 +9,11 @@ from .utils import download_from_url
 from .modal_transcribe import transcribe_url
 from ..database import (
     TranscriptStatus,
-    TranscriptionHistory,
     TranscriptInfoResponse,
     YoutubeTranscriptRequestForm
 )
 from uuid import UUID
 import tempfile
-
-def create_transcription_history(session: Session, user_id: UUID, transcript_id: UUID):
-    statement = select(TranscriptionHistory).where(TranscriptionHistory.user_id == user_id and TranscriptionHistory.transcript_id == transcript_id)
-    existing = session.exec(statement)
-    if existing:
-        return
-    history_entry = TranscriptionHistory(
-        user_id= user_id,
-        transcript_id=transcript_id,
-    )
-    session.add(history_entry)
-    session.commit()
-
 
 
 def _transcribe_core(
@@ -45,7 +31,7 @@ def _transcribe_core(
         return info
 
     except Exception:
-        update_status(session, info.id, TranscriptStatus.Transcripting.value)
+        update_status(session, info.id, TranscriptStatus.Error.value)
         raise
 
 
@@ -55,9 +41,7 @@ def transcribe_upload(
     user_id: UUID
 ) -> TranscriptInfoResponse:
 
-    info = check_exist_and_create_transcription_entry(session, form,user_id)
-
-    create_transcription_history(session, user_id, info.id)
+    info = check_exist_and_create_transcription_entry(session, form, user_id)
 
     return _transcribe_core(session, info)
 
@@ -83,10 +67,6 @@ def recover_orphaned_transcript(session: Session):
             results.append(result)
 
         except Exception as e:
-            # 👇 mark as error
-            update_status(session, t.id, TranscriptStatus.Error.value)
-
-            # 👇 log it (replace with proper logger later)
             print(f"[ERROR] Failed to recover transcript {t.id}: {e}")
 
             continue
