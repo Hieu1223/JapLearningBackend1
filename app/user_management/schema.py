@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 from uuid import UUID
 from sqlmodel import SQLModel
@@ -32,3 +32,12 @@ class UpdateUserRequest(SQLModel):
 # 🔹 PARTIAL UPDATE (PATCH)
 class UpdateUserPartialRequest(SQLModel):
     display_name: Optional[str] = None
+
+
+# 🔹 USER SETTINGS
+class UserSettingsResponse(SQLModel):
+    settings: dict[str, Any]
+
+
+class SaveUserSettingsRequest(SQLModel):
+    settings: dict[str, Any]

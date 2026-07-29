@@ -1,4 +1,5 @@
-from sqlmodel import Session,select
+from sqlmodel import Session, select
+from ..database import engine
 from ..database import (
     check_exist_and_create_transcription_entry,
     update_status,
@@ -36,14 +37,12 @@ def _transcribe_core(
 
 
 def transcribe_upload(
-    session: Session,
     form: YoutubeTranscriptRequestForm,
     user_id: UUID
 ) -> TranscriptInfoResponse:
-
-    info = check_exist_and_create_transcription_entry(session, form, user_id)
-
-    return _transcribe_core(session, info)
+    with Session(engine) as session:
+        info = check_exist_and_create_transcription_entry(session, form, user_id)
+        return _transcribe_core(session, info)
 
 
 

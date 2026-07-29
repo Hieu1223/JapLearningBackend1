@@ -51,6 +51,17 @@ class TranscriptionHistory(SQLModel, table=True):
     date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class VideoProgress(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
+
+    id: UUID = Field(primary_key=True, default_factory=uuid4)
+    user_id: UUID = Field(foreign_key="user.id")
+    resource_id: str = Field(index=True)
+    original_source: str = Field(default=SupportedSite.Youtube)
+    current_page: int = Field(default=0)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 # ── Request / Response schemas ────────────────────────────────────────────────
 
 class YoutubeIDTranscriptRequestForm(BaseModel):
@@ -140,3 +151,16 @@ class TranscriptDetailResponse(BaseModel):
     done: bool
     msg: str
     data: TranscriptResult | None = None
+
+
+class VideoProgressResponse(BaseModel):
+    resource_id: str
+    original_source: str
+    current_page: int
+    updated_at: datetime
+
+
+class SaveVideoProgressRequest(BaseModel):
+    resource_id: str
+    original_source: str
+    current_page: int

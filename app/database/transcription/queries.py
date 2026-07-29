@@ -2,6 +2,7 @@ from .schema import *
 from sqlmodel import Session, SQLModel, create_engine, select
 import json
 from uuid import UUID
+from datetime import datetime, timezone
 
 
 def to_info(t: Transcript) -> TranscriptInfoResponse:
@@ -217,3 +218,42 @@ def get_orphaned_transcriptions(session: Session):
 
     results = session.exec(stmt).all()
     return results
+
+
+# ── Video Progress Queries ─────────────────────────────────────────────────
+
+def get_video_progress(
+    session: Session, user_id: UUID, resource_id: str, original_source: str
+) -> VideoProgress | None:
+    return session.exec(
+        select(VideoProgress).where(
+            VideoProgress.user_id == user_id,
+            VideoProgress.resource_id == resource_id,
+            VideoProgress.original_source == original_source,
+        )
+    ).first()
+
+
+def save_video_progress(
+    session: Session,
+    user_id: UUID,
+    resource_id: str,
+    original_source: str,
+    current_page: int,
+) -> VideoProgress:
+    progress = get_video_progress(session, user_id, resource_id, original_source)
+    if not progress:
+        progress = VideoProgress(
+            user_id=user_id,
+            resource_id=resource_id,
+            original_source=original_source,
+            current_page=current_page,
+        )
+        session.add(progress)
+    else:
+        progress.current_page = current_page
+        progress.updated_at = datetime.now(timezone.utc)
+        session.add(progress)
+    session.commit()
+    session.refresh(progress)
+    return progress

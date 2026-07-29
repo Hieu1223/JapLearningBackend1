@@ -1,5 +1,5 @@
 from sqlmodel import Session
-from .schema import User
+from .schema import User, UserSettings
 
 
 def create_user(session: Session, display_name: str | None = None) -> User:
@@ -11,7 +11,6 @@ def create_user(session: Session, display_name: str | None = None) -> User:
 
 from sqlmodel import select
 from uuid import UUID
-
 
 def get_user_by_id(session: Session, user_id: UUID) -> User | None:
     statement = select(User).where(User.id == user_id)
@@ -53,3 +52,28 @@ def delete_user(session: Session, user_id: UUID) -> bool:
     session.delete(user)
     session.commit()
     return True
+
+
+# ── User Settings Queries ────────────────────────────────────────────────
+
+def get_user_settings(session: Session, user_id: UUID) -> UserSettings | None:
+    statement = select(UserSettings).where(UserSettings.user_id == user_id)
+    return session.exec(statement).first()
+
+
+def create_or_update_user_settings(
+    session: Session,
+    user_id: UUID,
+    settings: str,
+) -> UserSettings:
+    settings_entry = get_user_settings(session, user_id)
+    if not settings_entry:
+        settings_entry = UserSettings(user_id=user_id, settings=settings)
+        session.add(settings_entry)
+    else:
+        settings_entry.settings = settings
+        settings_entry.updated_at = datetime.utcnow()
+        session.add(settings_entry)
+    session.commit()
+    session.refresh(settings_entry)
+    return settings_entry

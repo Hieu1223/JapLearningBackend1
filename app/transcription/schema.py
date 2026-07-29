@@ -109,3 +109,16 @@ class TranscriptDetailResponse(BaseModel):
     done: bool
     msg: str
     data: TranscriptResult | None = None
+
+
+class VideoProgressResponse(BaseModel):
+    resource_id: str
+    original_source: str
+    current_page: int
+    updated_at: datetime
+
+
+class SaveVideoProgressRequest(BaseModel):
+    resource_id: str
+    original_source: str
+    current_page: int

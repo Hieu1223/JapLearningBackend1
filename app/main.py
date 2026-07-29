@@ -9,20 +9,29 @@ if sys.platform.startswith("win"):
 
 
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Annotated
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from .routes import *
 from .user_management import *
-from .database import create_db_and_tables,Session, engine
+from .database import create_db_and_tables, Session, engine
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],           # Allowed domains
-    allow_credentials=True,         # Support cookies/auth headers
-    allow_methods=["*"],             # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],             # Allow all request headers
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next):
+    from .container import set_db_session
+    with Session(engine) as session:
+        set_db_session(session)
+        response = await call_next(request)
+    return response
+
 
 @app.on_event("startup")
 def on_startup():

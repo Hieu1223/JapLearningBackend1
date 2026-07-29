@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
-from ..database import SessionDep
+
 from ..security.auth import CurrentUser
+from ..container import Container, get_db_session
 from .schema import (
     MangaPreview,
     MangaDetail,
@@ -12,75 +13,51 @@ from .schema import (
     ReadHistoryUpdate,
     ReadHistoryResponse,
 )
-from .controller import (
-    ctrl_get_manga_list,
-    ctrl_get_manga_detail,
-    ctrl_read_chapter,
-    ctrl_get_existing_ocr,
-    ctrl_stream_ocr,
-    ctrl_get_history,
-    ctrl_upsert_history,
-    ctr_delete_history
-)
 
 router = APIRouter(tags=["Manga"])
 
+_container = Container()
 
-# ─────────────────────────────────────────────────────────────
-# MANGA LIST / SEARCH
-# ─────────────────────────────────────────────────────────────
 
 @router.get("/manga", response_model=list[MangaPreview])
 async def list_manga(
-    session: SessionDep,
     q: Optional[str] = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    return ctrl_get_manga_list(session, query=q, limit=limit, offset=offset)
+    session = get_db_session()
+    return _container.manga_reader_service.get_manga_list(session, query=q, limit=limit, offset=offset)
 
-
-# ─────────────────────────────────────────────────────────────
-# AGGREGATE MANGA (detail + chapter list)
-# ─────────────────────────────────────────────────────────────
 
 @router.get("/manga/{manga_id}", response_model=MangaDetail)
 async def get_manga(
     manga_id: UUID,
-    session: SessionDep,
 ):
-    result = ctrl_get_manga_detail(session, manga_id)
+    session = get_db_session()
+    result = _container.manga_reader_service.get_manga_detail(session, manga_id)
     if not result:
         raise HTTPException(status_code=404, detail="Manga not found")
     return result
 
 
-# ─────────────────────────────────────────────────────────────
-# READ CHAPTER
-# ─────────────────────────────────────────────────────────────
-
 @router.get("/read/{chapter_id}", response_model=ReadResponse)
 async def read_chapter(
     chapter_id: UUID,
-    session: SessionDep,
 ):
-    result = ctrl_read_chapter(session, chapter_id)
+    session = get_db_session()
+    result = _container.manga_reader_service.read_chapter(session, chapter_id)
     if not result:
         raise HTTPException(status_code=404, detail="Chapter not found")
     return result
 
 
-# ─────────────────────────────────────────────────────────────
-# OCR
-# ─────────────────────────────────────────────────────────────
-
 @router.get("/ocr/{chapter_id}", response_model=OCRResultResponse)
 async def get_ocr(
     chapter_id: UUID,
-    session: SessionDep,
     user: CurrentUser,
 ):
-    result = ctrl_get_existing_ocr(session, chapter_id)
+    session = get_db_session()
+    result = _container.manga_reader_service.get_existing_ocr(session, chapter_id)
     if not result:
         raise HTTPException(
             status_code=404,
@@ -92,11 +69,11 @@ async def get_ocr(
 @router.get("/ocr/stream/{chapter_id}")
 async def stream_ocr(
     chapter_id: UUID,
-    session: SessionDep,
     user: CurrentUser,
     background_tasks: BackgroundTasks,
 ):
-    if ctrl_get_existing_ocr(session, chapter_id):
+    session = get_db_session()
+    if _container.manga_reader_service.get_existing_ocr(session, chapter_id):
         raise HTTPException(
             status_code=409,
             detail="Chapter already OCR'd. Fetch the result via GET /ocr/{chapter_id}.",
@@ -104,7 +81,7 @@ async def stream_ocr(
 
     try:
         return StreamingResponse(
-            ctrl_stream_ocr(session, chapter_id, user, background_tasks),
+            _container.manga_reader_service.stream_ocr(session, chapter_id, user, background_tasks),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -115,26 +92,22 @@ async def stream_ocr(
         raise HTTPException(status_code=422, detail=str(e))
 
 
-# ─────────────────────────────────────────────────────────────
-# HISTORY
-# ─────────────────────────────────────────────────────────────
-
 @router.get("/history", response_model=list[ReadHistoryResponse])
 async def get_history(
-    session: SessionDep,
     user: CurrentUser,
 ):
-    return ctrl_get_history(session, user)
+    session = get_db_session()
+    return _container.manga_reader_service.get_history(session, user)
 
 
 @router.post("/history", response_model=ReadHistoryResponse)
 async def upsert_history(
     data: ReadHistoryUpdate,
-    session: SessionDep,
     user: CurrentUser,
 ):
+    session = get_db_session()
     try:
-        return ctrl_upsert_history(
+        return _container.manga_reader_service.upsert_history(
             session,
             user_id=user,
             manga_id=data.manga_id,
@@ -143,13 +116,13 @@ async def upsert_history(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    
-def delete_read_history_by_id(
-    session: SessionDep,
+
+
+@router.delete("/history/{history_id}")
+async def delete_history_by_id(
     history_id: UUID,
-    user_id: CurrentUser,
-) -> bool:
-    
-    ctr_delete_history(session,user_id,history_id)
-    session.commit()
-    return True
+    user: CurrentUser,
+):
+    session = get_db_session()
+    _container.manga_reader_service.delete_history(session, user, history_id)
+    return {"success": True}
