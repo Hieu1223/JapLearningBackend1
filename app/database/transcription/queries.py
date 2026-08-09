@@ -212,7 +212,9 @@ def remove_history_entry(session: Session, history_id: UUID, user_id: UUID) -> b
 
 
 def get_orphaned_transcriptions(session: Session):
-    stmt = select(Transcript).where(
+    stmt = select(
+        Transcript
+    ).where(
         Transcript.status == TranscriptStatus.Transcripting.value,
     )
 

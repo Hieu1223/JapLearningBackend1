@@ -25,6 +25,20 @@ def get_users(session: Session, offset: int = 0, limit: int = 50) -> list[User]:
 from datetime import datetime
 
 
+def update_last_logged_in(
+    session: Session,
+    user_id: UUID,
+) -> User | None:
+    user = get_user_by_id(session, user_id)
+    if not user:
+        return None
+    user.last_logged_in = datetime.utcnow()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
 def update_user(
     session: Session,
     user_id: UUID,

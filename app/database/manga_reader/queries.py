@@ -34,7 +34,6 @@ def get_manga_with_chapters(session: Session, manga_id: UUID) -> Optional[Manga]
     """Returns manga with chapters eagerly loaded via relationship."""
     manga = session.get(Manga, manga_id)
     if manga:
-        # touch the relationship to trigger load
         _ = manga.chapters
     return manga
 
@@ -214,6 +213,16 @@ def get_read_histories(session: Session, user_id: UUID) -> list[ReadHistoryRow]:
     return [ReadHistoryRow(h, m, c) for h, m, c in rows]
 
 
+def get_read_history_by_id(
+    session: Session, history_id: UUID, user_id: UUID
+) -> Optional[ReadHistory]:
+    stmt = select(ReadHistory).where(
+        ReadHistory.id == history_id,
+        ReadHistory.user_id == user_id,
+    )
+    return session.exec(stmt).first()
+
+
 def upsert_read_history(
     session: Session,
     user_id: UUID,
@@ -244,6 +253,7 @@ def upsert_read_history(
     session.refresh(history)
     return history
 
+
 def delete_read_history(
     session: Session,
     user_id: UUID,
@@ -259,5 +269,36 @@ def delete_read_history(
         return False
 
     session.delete(history)
+    session.commit()
+    return True
+
+
+def delete_read_history_by_id(
+    session: Session,
+    history_id: UUID,
+    user_id: UUID,
+) -> bool:
+    stmt = select(ReadHistory).where(
+        ReadHistory.id == history_id,
+        ReadHistory.user_id == user_id,
+    )
+    history = session.exec(stmt).first()
+
+    if not history:
+        return False
+
+    session.delete(history)
+    session.commit()
+    return True
+
+
+def delete_ocr_result(session: Session, chapter_id: UUID) -> bool:
+    stmt = select(OCRResult).where(OCRResult.chapter_id == chapter_id)
+    ocr_result = session.exec(stmt).first()
+
+    if not ocr_result:
+        return False
+
+    session.delete(ocr_result)
     session.commit()
     return True

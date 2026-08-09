@@ -13,10 +13,11 @@ from .auth import (
 )
 from ..database import SessionDep
 from ..database.security.queries import get_auth_user_by_username, create_refresh_token as db_create_refresh_token, revoke_refresh_token
+from ..database.user.queries import update_last_logged_in
 
 router = APIRouter()
 
-@router.post("/token")
+@router.post("/token", tags=["Security"], description="Authenticate a user with username and password and issue a new access/refresh token pair")
 def login(
     session: SessionDep,
     form: OAuth2PasswordRequestForm = Depends()
@@ -25,6 +26,8 @@ def login(
     
     if not auth_entry or not verify_password(form.password, auth_entry.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
+    
+    update_last_logged_in(session, auth_entry.user_id)
     
     access_token = create_access_token(auth_entry.user_id)
     refresh_token = db_create_refresh_token(session, auth_entry.user_id)
@@ -35,7 +38,7 @@ def login(
         "token_type": "bearer"
     }
 
-@router.post("/token/refresh")
+@router.post("/token/refresh", tags=["Security"], description="Exchange a valid refresh token for a fresh access token")
 def refresh_access_token(
     session: SessionDep,
     refresh_token: str
@@ -44,13 +47,15 @@ def refresh_access_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
     
+    update_last_logged_in(session, user_id)
+    
     access_token = create_access_token(user_id)
     return {
         "access_token": access_token,
         "token_type": "bearer"
     }
 
-@router.post("/token/revoke")
+@router.post("/token/revoke", tags=["Security"], description="Revoke a refresh token so it can no longer be used to obtain access tokens")
 def revoke_token(
     session: SessionDep,
     refresh_token: str,

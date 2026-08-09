@@ -61,6 +61,13 @@ class Container:
             from .manga_reader.service import MangaReaderService
             self._services['manga_reader'] = MangaReaderService()
         return self._services['manga_reader']
+    
+    @property
+    def web_novel_service(self):
+        if 'web_novel' not in self._services:
+            from .web_novel.service import WebNovelService
+            self._services['web_novel'] = WebNovelService()
+        return self._services['web_novel']
 
 
 def get_container() -> Container:

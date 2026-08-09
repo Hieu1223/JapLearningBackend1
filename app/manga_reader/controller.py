@@ -12,6 +12,7 @@ from ..database.manga_reader.queries import (
     get_chapters_for_manga,
     get_ocr_result_with_user,
     save_ocr_result,
+    delete_ocr_result,
     get_read_histories,
     upsert_read_history,
     delete_read_history
@@ -205,6 +206,13 @@ async def ctrl_stream_ocr(
         yield f"data: {json.dumps(page)}\n\n"
 
     yield "data: [DONE]\n\n"
+
+
+def ctrl_reset_ocr(
+    session: Session,
+    chapter_id: UUID,
+) -> bool:
+    return delete_ocr_result(session, chapter_id)
 
 
 # ─────────────────────────────────────────────────────────────

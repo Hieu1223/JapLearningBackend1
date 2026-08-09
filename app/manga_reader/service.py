@@ -12,9 +12,11 @@ from ..database.manga_reader.queries import (
     get_chapters_for_manga,
     get_ocr_result_with_user,
     save_ocr_result,
+    delete_ocr_result,
     get_read_histories,
     upsert_read_history,
-    delete_read_history
+    delete_read_history,
+    delete_read_history_by_id,
 )
 from .schema import (
     OCRResponse,
@@ -223,6 +225,10 @@ class MangaReaderService:
         )
 
     def delete_history(self, session: Session, user_id: UUID, manga_id: UUID):
-        delete_read_history(session, user_id, manga_id)
-        session.commit()
-        return True
+        return delete_read_history(session, user_id, manga_id)
+
+    def delete_history_by_id(self, session: Session, user_id: UUID, history_id: UUID):
+        return delete_read_history_by_id(session, history_id, user_id)
+
+    def reset_ocr(self, session: Session, chapter_id: UUID) -> bool:
+        return delete_ocr_result(session, chapter_id)

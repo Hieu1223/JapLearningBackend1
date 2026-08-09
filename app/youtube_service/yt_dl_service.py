@@ -1,11 +1,10 @@
 from yt_dlp import YoutubeDL
 from typing import List, Optional
-from fastapi.exceptions import HTTPException
-from .schema import VideoInfo, VideoPreview,ChannelInfo,ChannelVideosResponse,ChannelPreview
+from .schema import VideoInfo, VideoPreview, ChannelInfo, ChannelVideosResponse, ChannelPreview
 
 import os
 
-proxy_url = os.getenv("HTTP_PROXY") 
+proxy_url = os.getenv("HTTP_PROXY")
 
 YDL_OPTS_SEARCH = {
     "quiet": True,
@@ -15,6 +14,12 @@ YDL_OPTS_SEARCH = {
 
 YDL_OPTS_VIDEO = {
     "quiet": True,
+    "proxy": proxy_url,
+}
+
+YDL_OPTS_PREVIEW = {
+    "quiet": True,
+    "extract_flat": True,
     "proxy": proxy_url,
 }
 
@@ -37,7 +42,7 @@ def search_youtube(query: str, limit: int = 10) -> List[VideoPreview]:
         try:
             results.append(VideoPreview.fromYtdlFlatJson(entry))
         except Exception:
-            continue  # skip malformed entries silently
+            continue
 
     return results
 
@@ -55,6 +60,21 @@ def get_video_by_id(video_id: str) -> Optional[VideoInfo]:
         return None
 
     return VideoInfo.fromYdtlJson(info)
+
+
+def get_preview_video(video_id: str) -> Optional[VideoPreview]:
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
+    try:
+        with YoutubeDL(YDL_OPTS_PREVIEW) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as err:
+        raise RuntimeError(f"yt-dlp video fetch failed: {str(err)}")
+
+    if not info:
+        return None
+
+    return VideoPreview.fromYtdlFlatJson(info)
 
 
 

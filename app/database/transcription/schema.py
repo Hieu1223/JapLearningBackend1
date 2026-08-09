@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Annotated
+from typing import Annotated, Optional
 from sqlmodel import SQLModel, Field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -35,6 +35,7 @@ class Transcript(SQLModel, table=True):
     data: str | None = Field(default=None)
     status: int = Field(default=TranscriptStatus.Uploading.value, index=True)
     public: bool = Field(default=True)
+    individual_settings: str | None = Field(default=None)
 
 
 class TranscriptionHistory(SQLModel, table=True):
@@ -141,6 +142,36 @@ class RemoveHistoryRequest(BaseModel):
     history_id: UUID
 
 
+class VideoDetail(BaseModel):
+    id: str
+    title: str
+    thumbnail_url: Optional[str]
+    channel: Optional[str] = None
+    duration: Optional[float] = None
+
+    @staticmethod
+    def from_dict(data: dict) -> "VideoDetail":
+        channel = data.get("channel", {})
+        channel_name = None
+        if isinstance(channel, dict):
+            channel_name = channel.get("name")
+        elif isinstance(channel, str):
+            channel_name = channel
+
+        thumbnails = data.get("thumbnails") or []
+        thumbnail_url = None
+        if thumbnails:
+            thumbnail_url = thumbnails[-1].get("url") if isinstance(thumbnails[-1], dict) else None
+
+        return VideoDetail(
+            id=data.get("id"),
+            title=data.get("title"),
+            thumbnail_url=thumbnail_url or data.get("thumbnail"),
+            channel=channel_name,
+            duration=data.get("duration"),
+        )
+
+
 class TranscriptDetailResponse(BaseModel):
     id: UUID
     original_source: str
@@ -150,7 +181,9 @@ class TranscriptDetailResponse(BaseModel):
     status: int
     done: bool
     msg: str
+    video: VideoDetail | None = None
     data: TranscriptResult | None = None
+    individual_settings: dict | None = None
 
 
 class VideoProgressResponse(BaseModel):
@@ -164,3 +197,8 @@ class SaveVideoProgressRequest(BaseModel):
     resource_id: str
     original_source: str
     current_page: int
+
+
+class SaveIndividualSettingsRequest(BaseModel):
+    transcript_id: UUID
+    settings: dict

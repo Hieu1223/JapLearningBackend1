@@ -19,7 +19,7 @@ router = APIRouter(tags=["Manga"])
 _container = Container()
 
 
-@router.get("/manga", response_model=list[MangaPreview])
+@router.get("/manga", response_model=list[MangaPreview], tags=["Manga"], description="List manga with optional text search and pagination")
 async def list_manga(
     q: Optional[str] = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
@@ -29,7 +29,7 @@ async def list_manga(
     return _container.manga_reader_service.get_manga_list(session, query=q, limit=limit, offset=offset)
 
 
-@router.get("/manga/{manga_id}", response_model=MangaDetail)
+@router.get("/manga/{manga_id}", response_model=MangaDetail, tags=["Manga"], description="Fetch the full metadata and chapter list for a single manga")
 async def get_manga(
     manga_id: UUID,
 ):
@@ -40,7 +40,7 @@ async def get_manga(
     return result
 
 
-@router.get("/read/{chapter_id}", response_model=ReadResponse)
+@router.get("/read/{chapter_id}", response_model=ReadResponse, tags=["Manga"], description="Load the readable pages and navigation info for a single chapter")
 async def read_chapter(
     chapter_id: UUID,
 ):
@@ -51,7 +51,7 @@ async def read_chapter(
     return result
 
 
-@router.get("/ocr/{chapter_id}", response_model=OCRResultResponse)
+@router.get("/ocr/{chapter_id}", response_model=OCRResultResponse, tags=["Manga"], description="Return a previously computed OCR result for a chapter")
 async def get_ocr(
     chapter_id: UUID,
     user: CurrentUser,
@@ -66,7 +66,7 @@ async def get_ocr(
     return result
 
 
-@router.get("/ocr/stream/{chapter_id}")
+@router.get("/ocr/stream/{chapter_id}", tags=["Manga"], description="Stream OCR extraction progress for a chapter as server-sent events, persisting the result when complete")
 async def stream_ocr(
     chapter_id: UUID,
     user: CurrentUser,
@@ -92,7 +92,7 @@ async def stream_ocr(
         raise HTTPException(status_code=422, detail=str(e))
 
 
-@router.get("/history", response_model=list[ReadHistoryResponse])
+@router.get("/history", response_model=list[ReadHistoryResponse], tags=["Manga"], description="Return the current user's manga reading history")
 async def get_history(
     user: CurrentUser,
 ):
@@ -100,7 +100,7 @@ async def get_history(
     return _container.manga_reader_service.get_history(session, user)
 
 
-@router.post("/history", response_model=ReadHistoryResponse)
+@router.post("/history", response_model=ReadHistoryResponse, tags=["Manga"], description="Create or update the user's reading progress for a manga chapter")
 async def upsert_history(
     data: ReadHistoryUpdate,
     user: CurrentUser,
@@ -118,11 +118,40 @@ async def upsert_history(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/history/{history_id}")
+@router.delete("/history/{history_id}", tags=["Manga"], description="Delete a single reading-history entry by its id")
 async def delete_history_by_id(
     history_id: UUID,
     user: CurrentUser,
 ):
     session = get_db_session()
-    _container.manga_reader_service.delete_history(session, user, history_id)
+    result = _container.manga_reader_service.delete_history_by_id(session, user, history_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="History not found")
+    return {"success": True}
+
+
+@router.delete("/history/manga/{manga_id}", tags=["Manga"], description="Delete all reading-history entries for a given manga")
+async def delete_history_by_manga(
+    manga_id: UUID,
+    user: CurrentUser,
+):
+    session = get_db_session()
+    result = _container.manga_reader_service.delete_history(session, user, manga_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="History not found")
+    return {"success": True}
+
+
+@router.delete("/ocr/{chapter_id}", tags=["Manga"], description="Clear a chapter's stored OCR result so it can be re-run")
+async def reset_ocr(
+    chapter_id: UUID,
+    user: CurrentUser,
+):
+    session = get_db_session()
+    result = _container.manga_reader_service.reset_ocr(session, chapter_id)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="No OCR result found for this chapter.",
+        )
     return {"success": True}

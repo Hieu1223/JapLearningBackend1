@@ -5,9 +5,9 @@ flashcard/schema.py  (API layer — Pydantic models)
 from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from enum import Enum
-from ..database.flashcard.schema import State
+from ..database.flashcard.schema import CardType
 
 
 class CardState(str, Enum):
@@ -16,28 +16,29 @@ class CardState(str, Enum):
     REVIEW     = "review"
     RELEARNING = "relearning"
 
-
-_STATE_MAP: dict[int, CardState] = {
-    State.New:        CardState.NEW,
-    State.Learning:   CardState.LEARNING,
-    State.Review:     CardState.REVIEW,
-    State.Relearning: CardState.RELEARNING,
-}
+class UserFlashcardSRS(BaseModel):
+    id: UUID
+    user_flashcard_id: UUID
+    srs_data: str
 
 
-def db_state_to_card_state(state: State) -> CardState:
-    return _STATE_MAP[int(state)]
+class UserSchedulerData(BaseModel):
+    id: UUID
+    data: str
 
 
-class AddCardRequest(BaseModel):
-    deck_id: UUID
-    front: str = Field(..., min_length=1)
-    back: str = Field(..., min_length=1)
+class AddVocabRequest(BaseModel):
+    word: str = Field(..., min_length=1, description="The vocabulary word (e.g. the Japanese term)")
+    meaning: str = Field(..., min_length=1, description="The meaning of the word (e.g. Vietnamese/English definition)")
 
 
-class ReviewRequest(BaseModel):
-    card_id: UUID
-    rating: Literal["again", "hard", "good", "easy"]
+class SaveReviewRequest(BaseModel):
+    """Payload from the frontend ts-fsrs scheduler.
+
+    ``card`` is the full ts-fsrs ``Card`` object (dates as ISO strings or
+    epoch-ms). The backend persists its fields into the fsrs-native SrsCard.
+    """
+    card: dict
 
 
 class DeckResponse(BaseModel):
@@ -52,8 +53,6 @@ class DeckResponse(BaseModel):
 class DeckStatsResponse(BaseModel):
     new:        int = 0
     learning:   int = 0
-    review:     int = 0
-    relearning: int = 0
     due:        int = 0
 
 
@@ -71,8 +70,6 @@ class DeckProgressResponse(BaseModel):
     total:      int
     new:        int
     learning:   int
-    review:     int
-    relearning: int
     due:        int
 
 
@@ -86,33 +83,42 @@ class PublicDeckResponse(BaseModel):
 
 
 class CardResponse(BaseModel):
-    id:      UUID
-    deck_id: UUID
-    front:   str
-    back:    str
-    state:       CardState
-    step:        Optional[int]   = None
-    stability:   Optional[float] = None
-    difficulty:  Optional[float] = None
-    due:         datetime
+    id:         UUID
+    deck_id:    UUID
+    data:       str
+    card_type:  CardType
+    state:      CardState
+    step:       Optional[int]   = None
+    stability:  Optional[float] = None
+    difficulty: Optional[float] = None
+    due:        Optional[datetime] = None
     last_review: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class DailyStatResponse(BaseModel):
-    date:     str
-    total:    int
-    correct:  int
-    wrong:    int
-    accuracy: float
+class CardWithSrsResponse(BaseModel):
+    id:           UUID
+    deck_id:      UUID
+    data:         str
+    card_type:    CardType
+    srs_queue:    Optional[int] = None
+    srs_due:      Optional[int] = None
+    srs_factor:   Optional[int] = None
+    srs_left:     Optional[int] = None
+    srs_ivl:      Optional[int] = None
+    srs_reps:     Optional[int] = None
+    srs_lapses:   Optional[int] = None
+    srs_data:     str = "{}"
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-class OverviewStatsResponse(BaseModel):
-    total_decks:    int
-    total_cards:    int
-    due_cards:      int
-    new_cards:      int
-    reviews_today:  int
-    accuracy:       float
-    streak_days:    int
+class ReviewSessionResponse(BaseModel):
+    cards: List[CardResponse]
+    total: int
+
+
+class ReviewSessionWithSrsResponse(BaseModel):
+    cards: List[CardWithSrsResponse]
+    total: int

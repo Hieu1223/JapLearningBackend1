@@ -5,3 +5,5 @@ from .youtube_service import router as youtube_router
 from .flashcard import router as flashcard_router
 from .manga_reader import router as manga_reader_router
 from .user_management import router as user_management_router
+from .web_novel import router as web_novel_router
+from .proxy import router as proxy_router

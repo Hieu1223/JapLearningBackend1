@@ -9,17 +9,17 @@ from ..database import (
     get_user_history,
     remove_history_entry,
     update_status,
+    TranscriptionHistory,
 )
 from ..database.transcription.schema import (
     Transcript,
-    TranscriptionHistory,
     TranscriptStatus,
-    TranscriptInfoResponse,
     TranscriptResult,
     TranscriptDetailResponse,
     UserHistoryListResponse,
     VideoProgress,
     VideoProgressResponse,
+    VideoDetail,
 )
 from .schema import (
     TranscriptRequestResponse,
@@ -43,6 +43,19 @@ class TranscriptionService:
         if done and t.data:
             data = TranscriptResult(**json.loads(t.data))
         
+        video_data = {
+            "id": t.resource_id,
+            "title": t.name,
+            "thumbnail_url": t.thumnail_url,
+            "channel": None,
+            "duration": None,
+        }
+        video_detail = VideoDetail.from_dict(video_data)
+        
+        individual_settings = None
+        if t.individual_settings:
+            individual_settings = json.loads(t.individual_settings)
+        
         return TranscriptDetailResponse(
             id=t.id,
             original_source=t.original_source,
@@ -52,8 +65,37 @@ class TranscriptionService:
             status=t.status,
             done=done,
             msg=msg,
+            video=video_detail,
             data=data,
+            individual_settings=individual_settings,
         )
+    
+    def save_individual_settings(
+        self,
+        session: Session,
+        transcript_id: UUID,
+        user_id: UUID,
+        settings: dict,
+    ) -> dict:
+        t = session.get(Transcript, transcript_id)
+        if not t:
+            raise ValueError(f"Transcript {transcript_id} not found")
+        
+        history_entry = session.exec(
+            select(TranscriptionHistory).where(
+                TranscriptionHistory.transcript_id == transcript_id,
+            )
+        ).first()
+        
+        if not history_entry or history_entry.user_id != user_id:
+            raise ValueError("Unauthorized access to transcript settings")
+        
+        t.individual_settings = json.dumps(settings)
+        session.add(t)
+        session.commit()
+        session.refresh(t)
+        
+        return {"success": True, "transcript_id": str(transcript_id)}
     
     def submit_transcription(
         self,
@@ -134,12 +176,24 @@ class TranscriptionService:
         done = False
         msg = "NotTranscribed"
         data = None
+        individual_settings = None
+        
+        video_data = {
+            "id": existing.resource_id,
+            "title": existing.name,
+            "thumbnail_url": existing.thumbnail_url,
+            "channel": None,
+            "duration": None,
+        }
+        video_detail = VideoDetail.from_dict(video_data)
         
         if t:
             done = t.status == TranscriptStatus.Finish.value
             msg = TranscriptStatus(t.status).name
             if done and t.data:
                 data = TranscriptResult(**json.loads(t.data))
+            if t.individual_settings:
+                individual_settings = json.loads(t.individual_settings)
         
         return TranscriptDetailResponse(
             id=t.id if t else existing.id,
@@ -150,7 +204,9 @@ class TranscriptionService:
             status=t.status if t else 0,
             done=done,
             msg=msg,
+            video=video_detail,
             data=data,
+            individual_settings=individual_settings,
         )
     
     def get_history(self, session: Session, user_id: UUID) -> UserHistoryListResponse:

@@ -13,10 +13,11 @@ from .schema import (
     DeckResponse,
     DeckProgressResponse,
     CardResponse,
-    ReviewRequest,
-    AddCardRequest,
-    DailyStatResponse,
-    OverviewStatsResponse,
+    CardWithSrsResponse,
+    SaveReviewRequest,
+    ReviewSessionResponse,
+    ReviewSessionWithSrsResponse,
+    AddVocabRequest,
     PublicDeckResponse,
 )
 
@@ -25,13 +26,13 @@ router = APIRouter()
 _container = Container()
 
 
-@router.get("/decks/public", response_model=List[PublicDeckResponse])
+@router.get("/decks/public", response_model=List[PublicDeckResponse], tags=["Decks"], description="Return every deck that has been shared publicly so the caller can browse and choose one to copy into their own collection")
 def browse_public_decks():
     session = get_db_session()
     return _container.flashcard_service.get_public_decks(session)
 
 
-@router.post("/decks/{deck_id}/copy", response_model=DeckWithStatsResponse)
+@router.post("/decks/{deck_id}/copy", response_model=DeckWithStatsResponse, tags=["Decks"], description="Clone a public deck, including all of its cards and their SRS scheduling data, into a fresh private deck owned by the current user")
 def copy_public_deck(
     deck_id: UUID,
     user_id: CurrentUser,
@@ -43,7 +44,7 @@ def copy_public_deck(
     return result
 
 
-@router.get("/decks", response_model=List[DeckWithStatsResponse])
+@router.get("/decks", response_model=List[DeckWithStatsResponse], tags=["Decks"], description="List every deck belonging to the current user, each enriched with live SRS counts (new, learning and due cards)")
 def read_decks(
     user_id: CurrentUser,
 ):
@@ -51,7 +52,7 @@ def read_decks(
     return _container.flashcard_service.list_decks_with_stats(session, user_id)
 
 
-@router.post("/decks", response_model=DeckWithStatsResponse)
+@router.post("/decks", response_model=DeckWithStatsResponse, tags=["Decks"], description="Create a new, empty flashcard deck for the current user, optionally marking it public so others can copy it")
 def create_deck(
     name: str,
     public: bool = False,
@@ -61,7 +62,7 @@ def create_deck(
     return _container.flashcard_service.create_deck(session, user_id, name, public)
 
 
-@router.patch("/decks/{deck_id}", response_model=DeckResponse)
+@router.patch("/decks/{deck_id}", response_model=DeckResponse, tags=["Decks"], description="Rename an existing deck; only the deck's owner may change its name")
 def update_deck(
     deck_id: UUID,
     name: str,
@@ -74,7 +75,7 @@ def update_deck(
     return updated
 
 
-@router.delete("/decks/{deck_id}")
+@router.delete("/decks/{deck_id}", tags=["Decks"], description="Permanently delete a deck along with all of its cards and their associated SRS scheduling records")
 def delete_deck(
     deck_id: UUID,
     user_id: CurrentUser = None,
@@ -85,7 +86,7 @@ def delete_deck(
     return {"success": True}
 
 
-@router.get("/decks/{deck_id}/progress", response_model=DeckProgressResponse)
+@router.get("/decks/{deck_id}/progress", response_model=DeckProgressResponse, tags=["Decks"], description="Compute the current SRS progress for a deck, reporting how many cards are new, in learning, and due for study")
 def get_deck_progress(
     deck_id: UUID,
 ):
@@ -93,7 +94,7 @@ def get_deck_progress(
     return _container.flashcard_service.get_deck_progress(session, deck_id)
 
 
-@router.get("/decks/{deck_id}/cards", response_model=List[CardResponse])
+@router.get("/decks/{deck_id}/cards", response_model=List[CardResponse], tags=["Cards"], description="Return all cards in a deck together with their derived SRS state (new, learning, review or relearning) and scheduling info")
 def get_cards_in_deck(
     deck_id: UUID,
 ):
@@ -101,18 +102,19 @@ def get_cards_in_deck(
     return _container.flashcard_service.list_cards(session, deck_id)
 
 
-@router.post("/cards", response_model=CardResponse)
-def add_card(
-    req: AddCardRequest,
+@router.post("/decks/{deck_id}/cards/vocab", response_model=CardResponse, tags=["Cards"], description="Add a vocabulary card to a deck by supplying the word and its meaning; the card is stored as a vocab card with a sorting id of the form <word>-vocab for ordering and duplicate detection, and its initial SRS scheduling data is seeded")
+def add_vocab(
+    deck_id: UUID,
+    req: AddVocabRequest,
     user_id: CurrentUser = None,
 ):
     session = get_db_session()
-    result = _container.flashcard_service.add_card(
+    result = _container.flashcard_service.add_vocab(
         session=session,
         user_id=user_id,
-        deck_id=req.deck_id,
-        front=req.front,
-        back=req.back,
+        deck_id=deck_id,
+        word=req.word,
+        meaning=req.meaning,
     )
     if not result:
         raise HTTPException(
@@ -122,8 +124,9 @@ def add_card(
     return result
 
 
-@router.delete("/cards/{card_id}")
+@router.delete("/decks/{deck_id}/cards/{card_id}", tags=["Cards"], description="Remove a single card and its SRS scheduling record from its deck")
 def delete_card(
+    deck_id: UUID,
     card_id: UUID,
     user_id: CurrentUser = None,
 ):
@@ -133,8 +136,9 @@ def delete_card(
     return {"success": True}
 
 
-@router.post("/cards/{card_id}/reset")
+@router.post("/decks/{deck_id}/cards/{card_id}/reset", tags=["Cards"], description="Reset a card's SRS data back to a brand-new state so it re-enters the learning queue from scratch")
 def reset_card(
+    deck_id: UUID,
     card_id: UUID,
     user_id: CurrentUser = None,
 ):
@@ -144,43 +148,29 @@ def reset_card(
     return {"success": True}
 
 
-@router.get("/decks/{deck_id}/next", response_model=Optional[CardResponse])
-def read_next_card(
+@router.get("/decks/{deck_id}/review-session", response_model=ReviewSessionWithSrsResponse, tags=["Reviews"], description="Load the next batch of cards in a deck that are due for review (new, learning, relearning or review-past-due) with their raw FSRS scheduling fields")
+def load_review_session(
     deck_id: UUID,
+    limit: int = Query(20, ge=1, le=100),
 ):
     session = get_db_session()
-    return _container.flashcard_service.fetch_due_card(session, deck_id)
+    result = _container.flashcard_service.load_review_session_with_srs(session, deck_id, limit)
+    return result
 
 
-@router.post("/cards/review", response_model=CardResponse)
+@router.post("/cards/{card_id}/review", response_model=CardResponse, tags=["Reviews"], description="Persist the ts-fsrs Card object computed by the frontend scheduler for a card and return the card with its new state")
 def review_card(
-    req: ReviewRequest,
+    card_id: UUID,
+    req: SaveReviewRequest,
     user_id: CurrentUser = None,
 ):
     session = get_db_session()
-    rating_map = {"again": 1, "hard": 2, "good": 3, "easy": 4}
-    rating_int = rating_map.get(req.rating.lower())
-    if rating_int is None:
-        raise HTTPException(status_code=400, detail="Invalid rating")
-
-    updated = _container.flashcard_service.handle_review(session, user_id, req.card_id, rating_int)
+    updated = _container.flashcard_service.save_review(
+        session,
+        user_id,
+        card_id,
+        card=req.card,
+    )
     if not updated:
         raise HTTPException(status_code=404, detail="Card not found or not owned by user")
     return updated
-
-
-@router.get("/stats/daily", response_model=List[DailyStatResponse])
-def get_daily_stats(
-    days: int = 30,
-    user_id: CurrentUser = None,
-):
-    session = get_db_session()
-    return _container.flashcard_service.get_daily_stats(session, user_id, days)
-
-
-@router.get("/stats/overview", response_model=OverviewStatsResponse)
-def get_overview_stats(
-    user_id: CurrentUser = None,
-):
-    session = get_db_session()
-    return _container.flashcard_service.get_overview_stats(session, user_id)

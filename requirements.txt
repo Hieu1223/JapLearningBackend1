@@ -54,6 +54,7 @@ sqlmodel==0.0.38
 starlette==1.0.0
 SudachiDict-full
 SudachiPy==0.6.10
+marisa-trie==1.4.1
 synchronicity==0.12.2
 toml==0.10.2
 typer==0.24.1

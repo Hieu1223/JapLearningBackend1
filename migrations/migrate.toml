@@ -1,0 +1,52 @@
+# Migration configuration
+#
+# This file controls where the migration runs and which source it reads from.
+# Copy it (or override via env vars) when deploying to production so the same
+# migration script can target a different database.
+#
+# Precedence: environment variables > this file > built-in defaults.
+# Supported env overrides:
+#   MIGRATION_TARGET_URL   - target (current) database connection string
+#   MIGRATION_SOURCE_URL   - source (old_db) database connection string
+#   MIGRATION_OLD_SQL_PATH - path to old_db.sql if source is a file, not a live DB
+
+[source]
+# The OLD database. You have two options:
+#   1. A live database that already has the old schema loaded  -> set `url`
+#   2. A plain SQL dump file (e.g. ref/old_db.sql)             -> set `sql_file`
+#
+# If `sql_file` is set, the runner will load it into the target DB inside a
+# dedicated `legacy_2026` schema (so it never collides with the current tables)
+# and migrate from there. Only the `public` tables from the dump are used.
+#
+# For production, point this at your actual old database before it is
+# decommissioned, OR keep shipping the dump file alongside this config.
+sql_file = "ref/old_db.sql"
+# url = "postgresql://user:pass@old-host:5432/old_db"
+
+[target]
+# The CURRENT database the app uses. In production set this to the real
+# production connection string (e.g. via MIGRATION_TARGET_URL).
+url = "postgresql://postgres:postgres@localhost:5432/jap_learning"
+
+[options]
+# Name of the scratch schema where the old dump is staged.
+staging_schema = "legacy_2026"
+
+# Tables in the old `public` schema that are intentionally NOT migrated.
+# `word`, `kanji` and `wordkanjireading` were part of the old schema but are
+# unused by the application and have no corresponding model in the current
+# codebase, so they are dropped. As a consequence the referencing columns
+# `card.word_id` and `reviewlog.word_id` are also dropped during migration.
+exclude_tables = ["word", "kanji", "wordkanjireading"]
+
+# Flashcard tables (deck, card, srscard, reviewlog) are always excluded by the
+# runner regardless of this list, per the migration requirement.
+
+# Re-run safety:
+#   true  -> skip any step that has already been applied (idempotent re-run)
+#   false -> fail if a step was already applied (strict, first-run only)
+idempotent = true
+
+# If true, drop the staging schema at the end of a successful run.
+drop_staging_on_success = true

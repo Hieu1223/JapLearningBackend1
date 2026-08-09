@@ -17,6 +17,7 @@ class UserResponse(SQLModel):
     display_name: Optional[str]
     created_at: datetime
     updated_at: datetime
+    last_logged_in: Optional[datetime] = None
 
 
 # 🔹 RESPONSE: User (with optional email if you later add it)

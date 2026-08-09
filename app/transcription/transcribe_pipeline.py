@@ -13,6 +13,8 @@ from ..database import (
     TranscriptInfoResponse,
     YoutubeTranscriptRequestForm
 )
+from ..tokenization.tokenize import merge_transcript_tokens
+from ..transcription.schema import TranscriptResult, TokenTimestamp
 from uuid import UUID
 import tempfile
 
@@ -26,6 +28,21 @@ def _transcribe_core(
 
         data = transcribe_url(info.resource_url)
 
+        # When the transcript is received, tokenize each segment's text with
+        # Sudachi and merge the morphemes using the WhisperX word timestamps,
+        # replacing each segment's raw words with the merged tokens.
+        try:
+            result = TranscriptResult(**data)
+            merged = merge_transcript_tokens(result.segments)
+            for seg, seg_words in zip(result.segments, merged):
+                seg.words = [
+                    TokenTimestamp(token=w["token"], start=w["start"], end=w["end"])
+                    for w in seg_words
+                ]
+            data = result.model_dump()
+        except Exception as e:
+            print(f"[WARN] token merge failed for transcript {info.id}: {e}")
+
         save_transcript(session, info.id, data)
         update_status(session, info.id, TranscriptStatus.Finish.value)
 
@@ -34,6 +51,7 @@ def _transcribe_core(
     except Exception:
         update_status(session, info.id, TranscriptStatus.Error.value)
         raise
+
 
 
 def transcribe_upload(

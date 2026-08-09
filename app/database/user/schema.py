@@ -9,6 +9,7 @@ class User(SQLModel, table=True):
     display_name: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_logged_in: Optional[datetime] = None
 
 
 class UserSettings(SQLModel, table=True):

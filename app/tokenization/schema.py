@@ -10,8 +10,8 @@ class WordEntry(BaseModel):
     meaning: str
 
 
-class WordResponse(BaseModel):
-    id: UUID
+class WordLookupEntry(BaseModel):
+    id: int
     word: str
     reading: str
     meaning: str
@@ -21,23 +21,9 @@ class WordResponse(BaseModel):
 
 class WordLookupResponse(BaseModel):
     query: str
-    results: List[WordResponse]
+    results: List[WordLookupEntry]
     total: int
 
-    model_config = ConfigDict(from_attributes=True)
-
-
-class KanjiResponse(BaseModel):
-    id: UUID
-    kanji: str
-    reading: Optional[str] = None
-    strokes: Optional[int] = None
-    radical: Optional[str] = None
-    unicode: Optional[str] = None
-    shape: Optional[str] = None
-    meanings: Optional[str] = None
-    words: List[WordResponse] = []
-  
     model_config = ConfigDict(from_attributes=True)
 
 
