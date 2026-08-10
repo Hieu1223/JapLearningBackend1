@@ -32,7 +32,7 @@ try:
 except ImportError:
     sys.exit("psycopg2 is required (pip install psycopg2)")
 
-# Reuse the exact same merge logic / Sudachi setting as the app.
+Reuse the exact same merge logic / GiNZA setting as the app.
 from app.tokenization.tokenize import merge_transcript_tokens  # noqa: E402
 
 

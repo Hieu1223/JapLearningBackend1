@@ -1,50 +1,111 @@
-from sudachipy import tokenizer
-from sudachipy import dictionary as sudachi_dictionary
+import spacy
+import ginza
 from typing import List, Optional
 import re
 
 from .schema import Token
 
-tokenizer_obj = sudachi_dictionary.Dictionary(dict="full").create()
-mode = tokenizer.Tokenizer.SplitMode.C
+_nlp = spacy.load("ja_core_news_sm")
 
 
 def split_japanese_sentences(text: str) -> list[str]:
     sentences = re.split(r"(?<=[。！？?])", text)
     return [s.strip() for s in sentences if s.strip()]
 
+
+DEP_DESCRIPTION = {
+    "ROOT": "root (main predicate / head of the sentence)",
+    "nsubj": "nominal subject (the noun performing the action)",
+    "nsubj:pass": "passive nominal subject",
+    "obj": "object (the noun affected by the action)",
+    "iobj": "indirect object",
+    "csubj": "clausal subject",
+    "csubj:pass": "passive clausal subject",
+    "ccomp": "clausal complement",
+    "xcomp": "open clausal complement",
+    "obl": "oblique nominal (adverbial-like argument)",
+    "obl:agent": "agent of a passive verb",
+    "vocative": "vocative (direct address)",
+    "expl": "expletive / pleonastic subject",
+    "dislocated": "dislocated element",
+    "advcl": "adverbial clause modifier",
+    "advmod": "adverbial modifier",
+    "amod": "adjectival modifier",
+    "nummod": "numeric modifier",
+    "nounmod": "noun modifier (genitive/possessive)",
+    "nmod": "nominal modifier",
+    "appos": "appositional modifier",
+    "compound": "compound word element",
+    "flat": "flat multiword expression",
+    "fixed": "fixed multiword expression",
+    "acl": "adjectival clause",
+    "acl:relcl": "relative clause modifier",
+    "det": "determiner",
+    "clf": "classifier",
+    "case": "case marker (particle marking a dependency)",
+    "mark": "marker (subordinating/dependency-marking particle)",
+    "aux": "auxiliary verb",
+    "aux:pass": "passive auxiliary",
+    "cop": "copula",
+    "punct": "punctuation",
+    "conj": "conjunct (coordinated element)",
+    "cc": "coordinating conjunction",
+    "list": "list element",
+    "discourse": "discourse element (interjection, etc.)",
+    "parataxis": "parataxis (loosely attached clause)",
+    "orphan": "orphan (elided head dependency)",
+    "goeswith": "goes with (unconventional token split)",
+    "reparandum": "overridden disfluency",
+    "dep": "unspecified dependency",
+    "root": "root (main predicate / head of the sentence)",
+}
+
+
+def describe_dep(dep: str) -> str:
+    return DEP_DESCRIPTION.get(dep, f"unspecified dependency ({dep})")
+
+
 async def tokenize(text: str) -> list[Token]:
     result: list[Token] = []
     sentences = split_japanese_sentences(text)
 
     for sent_id, sentence in enumerate(sentences):
-        for t in tokenizer_obj.tokenize(sentence, mode):
+        doc = _nlp(sentence)
+        offset = 0
+        for t in doc:
+            is_root = t.head == t
+            end = offset + len(t.text)
+            pos_parts = tuple(t.tag_.split("-")) if t.tag_ else (t.pos_,)
             result.append(
                 Token(
                     sentence_id=sent_id,
-                    surface=t.surface(),
-                    normalized=t.normalized_form(),
-                    dictionary_form=t.dictionary_form(),
-                    reading=t.reading_form(),
-                    pos=t.part_of_speech(),
-                    word_id=t.word_id(),
-                    begin=t.begin(),
-                    end=t.end(),
+                    surface=t.text,
+                    normalized=t.text,
+                    dictionary_form=t.lemma_,
+                    reading=ginza.reading_form(t, use_orth_if_none=True),
+                    pos=pos_parts,
+                    word_id=hash((t.text, t.lemma_, t.pos_)) & 0x7FFFFFFF,
+                    begin=offset,
+                    end=end,
+                    dep=t.dep_ or None,
+                    dep_description=describe_dep(t.dep_) if t.dep_ else None,
+                    head_index=t.head.i if not is_root else None,
+                    head_surface=t.head.text if not is_root else None,
                 )
             )
+            offset = end
 
     return result
 
 
 def merge_transcript_tokens(segments: list) -> list[list[dict]]:
-    """Tokenize each segment's text with Sudachi and merge the morphemes using
-    the WhisperX word-level timestamps.
+    """Tokenize each segment's text with GiNZA/spaCy and merge the morphemes
+    using the WhisperX word-level timestamps.
 
     For every segment the WhisperX ``words`` (``{token, start, end}``) are
-    concatenated to rebuild the segment text and a char->timestamp map. Sudachi
-    (current setting: full dictionary, SplitMode.C) then tokenizes that text,
-    and each Sudachi morpheme is assigned the min start / max end of the
-    overlapping WhisperX words.
+    concatenated to rebuild the segment text and a char->timestamp map. GiNZA
+    then tokenizes that text, and each token is assigned the min start / max end
+    of the overlapping WhisperX words.
 
     Returns a list (one per segment) of merged ``TokenTimestamp`` dicts
     (``{token, start, end}``) in the same shape as the original ``words``.
@@ -70,18 +131,18 @@ def merge_transcript_tokens(segments: list) -> list[list[dict]]:
             char_start.extend([start] * len(token))
             char_end.extend([end] * len(token))
 
+        doc = _nlp(seg_text)
         seg_merged: list[dict] = []
-        for t in tokenizer_obj.tokenize(seg_text, mode):
-            surface = t.surface()
-            b = t.begin()
-            e = t.end()
+        for t in doc:
+            b = t.idx
+            e = t.idx + len(t.text)
             window_start = char_start[b:e]
             window_end = char_end[b:e]
             starts = [s for s in window_start if s is not None]
             ends = [s for s in window_end if s is not None]
             seg_merged.append(
                 {
-                    "token": surface,
+                    "token": t.text,
                     "start": min(starts) if starts else None,
                     "end": max(ends) if ends else None,
                 }
@@ -90,4 +151,3 @@ def merge_transcript_tokens(segments: list) -> list[list[dict]]:
         merged_per_segment.append(seg_merged)
 
     return merged_per_segment
-

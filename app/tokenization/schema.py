@@ -37,7 +37,35 @@ class Token(BaseModel):
     word_id: int
     begin: int
     end: int
+    dep: Optional[str] = None
+    dep_description: Optional[str] = None
+    head_index: Optional[int] = None
+    head_surface: Optional[str] = None
 
 
 class TokenList(BaseModel):
     tokens: List[Token]
+
+
+class DependencyLink(BaseModel):
+    token_index: int
+    surface: str
+    reading: Optional[str] = None
+    lemma: str
+    pos: Tuple[str, ...]
+    dep: str
+    dep_description: str
+    head_index: Optional[int] = None
+    head_surface: Optional[str] = None
+    is_root: bool = False
+
+
+class DependencyTree(BaseModel):
+    sentence_id: int
+    text: str
+    tokens: List[DependencyLink]
+
+
+class DependencyTreeResponse(BaseModel):
+    text: str
+    sentences: List[DependencyTree]

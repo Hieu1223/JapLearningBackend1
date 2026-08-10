@@ -72,11 +72,13 @@ class MangaReaderService:
         query: Optional[str],
         limit: int,
         offset: int,
+        tags: Optional[list[str]] = None,
+        order_by: Optional[str] = None,
     ) -> list[MangaPreview]:
         if query:
-            mangas = search_manga(session, query, limit, offset)
+            mangas = search_manga(session, query, limit, offset, tags=tags, order_by=order_by)
         else:
-            mangas = get_manga_list(session, limit, offset)
+            mangas = get_manga_list(session, limit, offset, tags=tags, order_by=order_by)
         return [_manga_preview(m) for m in mangas]
 
     def get_manga_detail(self, session: Session, manga_id: UUID) -> Optional[MangaDetail]:

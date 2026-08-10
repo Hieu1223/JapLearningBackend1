@@ -11,18 +11,53 @@ from .schema import Manga, Chapter, OCRResult, ReadHistory, User
 # MANGA
 # ─────────────────────────────────────────────────────────────
 
-def get_manga_list(session: Session, limit: int = 20, offset: int = 0) -> list[Manga]:
-    stmt = select(Manga).limit(limit).offset(offset)
+def _apply_manga_filters(stmt, query: Optional[str], tags: Optional[list[str]]):
+    if query:
+        stmt = stmt.where(Manga.title.ilike(f"%{query}%"))
+    if tags:
+        for tag in tags:
+            stmt = stmt.where(Manga.genres.ilike(f'%"{tag}"%'))
+    return stmt
+
+
+def _apply_manga_order(stmt, order_by: Optional[str]):
+    desc = order_by.startswith("-") if order_by else False
+    key = order_by[1:] if desc else order_by
+    if key in ("latest", "updated_at"):
+        return stmt.order_by(Manga.updated_at.desc() if desc else Manga.updated_at)
+    if key in ("az", "title"):
+        return stmt.order_by(Manga.title.desc() if desc else Manga.title)
+    if key in ("created", "created_at"):
+        return stmt.order_by(Manga.created_at.desc() if desc else Manga.created_at)
+    return stmt.order_by(Manga.updated_at.desc())
+
+
+def get_manga_list(
+    session: Session,
+    limit: int = 20,
+    offset: int = 0,
+    tags: Optional[list[str]] = None,
+    order_by: Optional[str] = None,
+) -> list[Manga]:
+    stmt = select(Manga)
+    stmt = _apply_manga_filters(stmt, None, tags)
+    stmt = _apply_manga_order(stmt, order_by)
+    stmt = stmt.limit(limit).offset(offset)
     return list(session.exec(stmt).all())
 
 
-def search_manga(session: Session, query: str, limit: int = 20, offset: int = 0) -> list[Manga]:
-    stmt = (
-        select(Manga)
-        .where(Manga.title.ilike(f"%{query}%"))
-        .limit(limit)
-        .offset(offset)
-    )
+def search_manga(
+    session: Session,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    tags: Optional[list[str]] = None,
+    order_by: Optional[str] = None,
+) -> list[Manga]:
+    stmt = select(Manga)
+    stmt = _apply_manga_filters(stmt, query, tags)
+    stmt = _apply_manga_order(stmt, order_by)
+    stmt = stmt.limit(limit).offset(offset)
     return list(session.exec(stmt).all())
 
 

@@ -29,7 +29,7 @@ def _transcribe_core(
         data = transcribe_url(info.resource_url)
 
         # When the transcript is received, tokenize each segment's text with
-        # Sudachi and merge the morphemes using the WhisperX word timestamps,
+        # GiNZA/spaCy and merge the morphemes using the WhisperX word timestamps,
         # replacing each segment's raw words with the merged tokens.
         try:
             result = TranscriptResult(**data)
