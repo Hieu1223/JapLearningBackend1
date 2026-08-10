@@ -16,7 +16,7 @@ def _apply_manga_filters(stmt, query: Optional[str], tags: Optional[list[str]]):
         stmt = stmt.where(Manga.title.ilike(f"%{query}%"))
     if tags:
         for tag in tags:
-            stmt = stmt.where(Manga.genres.ilike(f'%"{tag}"%'))
+            stmt = stmt.where(Manga.genres.ilike(f'%"{tag}%'))
     return stmt
 
 

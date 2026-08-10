@@ -63,9 +63,9 @@ async def list_manga(
     )
 
 
-@router.get("/tags", response_model=list[str], tags=["Manga"], description="List all available manga genre tags with optional search, ordering and pagination")
+@router.get("/tags", response_model=list[str], tags=["Manga"], description="List all available manga genre tags with optional prefix search, ordering and pagination")
 async def list_tags(
-    q: Optional[str] = Query(default=None, description="Case-insensitive substring filter on tag name"),
+    q: Optional[str] = Query(default=None, description="Case-insensitive prefix filter on tag name"),
     order_by: Optional[str] = Query(
         default=None,
         description="Sort order: az (A-Z), -az (Z-A), len (shortest first), -len (longest first)",
@@ -76,7 +76,7 @@ async def list_tags(
     tags = _ALL_TAGS
     if q:
         q_lower = q.lower()
-        tags = [t for t in tags if q_lower in t.lower()]
+        tags = [t for t in tags if t.lower().startswith(q_lower)]
     tags = _order_tags(tags, order_by)
     return tags[offset:offset + limit]
 
