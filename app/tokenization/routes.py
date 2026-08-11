@@ -1,8 +1,15 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import Annotated, List, Optional
 
 import ginza
+import spacy
 
+from ..container import get_db_session
+from ..database.tokenization import (
+    save_tokenization_history,
+    get_user_tokenization_history,
+    delete_tokenization_history,
+)
 from .schema import (
     WordLookupResponse,
     WordLookupEntry,
@@ -11,9 +18,14 @@ from .schema import (
     DependencyTreeResponse,
     DependencyTree,
     DependencyLink,
+    TokenizeDependenciesRequest,
+    TokenizeDependenciesResponse,
+    TokenizationHistoryItem,
+    TokenizationHistoryListResponse,
 )
-from .tokenize import _nlp, tokenize, describe_dep
+from .tokenize import _nlp, tokenize, describe_dep, build_dependency_tree
 from .dictionary import get_dictionary
+from uuid import UUID
 
 router = APIRouter(tags=["tokenization"])
 
@@ -87,36 +99,76 @@ def describe_dep(dep: str) -> str:
 async def dependency_tree_endpoint(
     text: Annotated[str, Query(..., min_length=1)],
 ):
-    doc = _nlp(text)
-
-    sentences: list[DependencyTree] = []
-    for sent_id, sent in enumerate(doc.sents):
-        links: list[DependencyLink] = []
-        for t in sent:
-            is_root = t.head == t
-            links.append(
-                DependencyLink(
-                    token_index=t.i,
-                    surface=t.text,
-                    reading=ginza.reading_form(t, use_orth_if_none=True),
-                    lemma=t.lemma_,
-                    pos=tuple(t.tag_.split("-")) if t.tag_ else (t.pos_,),
-                    dep=t.dep_,
-                    dep_description=describe_dep(t.dep_),
-                    head_index=t.head.i if not is_root else None,
-                    head_surface=t.head.text if not is_root else None,
-                    is_root=is_root,
-                )
-            )
-        sentences.append(
-            DependencyTree(
-                sentence_id=sent_id,
-                text=sent.text,
-                tokens=links,
-            )
-        )
-
+    sentences = build_dependency_tree(text)
     return DependencyTreeResponse(text=text, sentences=sentences)
+
+
+@router.post(
+    "/dependency-tree/save",
+    response_model=TokenizeDependenciesResponse,
+    tags=["tokenization"],
+    description="Parse Japanese input text with GiNZA and build the dependency tree of each sentence, then save the analysis to the user's history (separate table) and return it",
+)
+async def save_dependency_tree(
+    req: TokenizeDependenciesRequest,
+):
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="text must not be empty")
+
+    sentences = build_dependency_tree(req.text)
+
+    session = get_db_session()
+    history = save_tokenization_history(
+        session, req.user_id, req.text, len(sentences)
+    )
+
+    return TokenizeDependenciesResponse(
+        history_id=history.id,
+        text=req.text,
+        sentences=sentences,
+    )
+
+
+@router.get(
+    "/dependency-tree/history",
+    response_model=TokenizationHistoryListResponse,
+    tags=["tokenization"],
+    description="Return the current user's saved tokenization/dependency-tree history",
+)
+async def get_dependency_tree_history(
+    user_id: Annotated[UUID, Query(..., description="User id that owns the history")],
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    session = get_db_session()
+    rows = get_user_tokenization_history(session, user_id, offset, limit)
+    items = [
+        TokenizationHistoryItem(
+            history_id=r.id,
+            text=r.text,
+            sentences=r.sentences,
+            date_created=r.date_created,
+        )
+        for r in rows
+    ]
+    return TokenizationHistoryListResponse(items=items, total=len(items))
+
+
+@router.delete(
+    "/dependency-tree/history/{history_id}",
+    tags=["tokenization"],
+    status_code=204,
+    description="Delete a single entry from the current user's tokenization history",
+)
+async def delete_dependency_tree_history(
+    history_id: UUID,
+    user_id: Annotated[UUID, Query(..., description="User id that owns the history")],
+):
+    session = get_db_session()
+    deleted = delete_tokenization_history(session, history_id, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    return None
 
 
 @router.get("/dictionary/words/lookup", response_model=WordLookupResponse, tags=["tokenization"], description="Search the Japanese dictionary by word or reading and return matching entries with meanings")

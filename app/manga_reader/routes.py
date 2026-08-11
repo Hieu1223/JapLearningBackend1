@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
 
+from ..database.manga_reader.queries import backfill_ocr_analysis
 from ..security.auth import CurrentUser
 from ..container import Container, get_db_session
 from .schema import (
@@ -103,13 +104,15 @@ async def read_chapter(
     return result
 
 
-@router.get("/ocr/{chapter_id}", response_model=OCRResultResponse, tags=["Manga"], description="Return a previously computed OCR result for a chapter")
+@router.get("/ocr/{chapter_id}", response_model=OCRResultResponse, tags=["Manga"], description="Return a previously computed OCR result for a chapter, paginated by page using offset/limit to avoid loading the full (potentially huge) OCR payload at once")
 async def get_ocr(
     chapter_id: UUID,
     user: CurrentUser,
+    offset: int = Query(0, ge=0, description="Page offset into the chapter's OCR pages"),
+    limit: int = Query(50, ge=1, le=200, description="Number of OCR pages to return"),
 ):
     session = get_db_session()
-    result = _container.manga_reader_service.get_existing_ocr(session, chapter_id)
+    result = _container.manga_reader_service.get_existing_ocr(session, chapter_id, offset, limit)
     if not result:
         raise HTTPException(
             status_code=404,
@@ -118,7 +121,53 @@ async def get_ocr(
     return result
 
 
-@router.get("/ocr/stream/{chapter_id}", tags=["Manga"], description="Stream OCR extraction progress for a chapter as server-sent events, persisting the result when complete")
+@router.get("/ocr/stream/{chapter_id}", tags=["Manga"], description="""Stream OCR extraction progress for a chapter as server-sent events (media_type text/event-stream), persisting the result when complete.
+
+Each event is a line "data: <json>\\n\\n" where <json> is an OCRPage augmented with GiNZA tokenization + dependency analysis:
+
+{
+  "version": "1",
+  "img_width": 100,
+  "img_height": 100,
+  "analyze": [ DependencyTree, ... ],          // page-level trees (one per sentence)
+  "blocks": [
+    {
+      "box": [x1, y1, x2, y2],
+      "vertical": false,
+      "font_size": 12.0,
+      "lines_coords": [ [ [x, y], ... ] ],       // 4 points per line
+      "lines": ["私は学生です。", "これは本です。"],
+      "analyze": [                               // one entry per line in `lines`
+        [ DependencyTree, ... ],
+        [ DependencyTree, ... ]
+      ]
+    }
+  ]
+}
+
+After all page events a final event "data: [DONE]\\n\\n" is emitted.
+
+A DependencyTree is:
+{
+  "sentence_id": 0,
+  "text": "私は学生です。",
+  "tokens": [ DependencyLink, ... ]
+}
+
+A DependencyLink (one per token, built by GiNZA) is:
+{
+  "token_index": 0,
+  "surface": "私",
+  "reading": "わたし",
+  "lemma": "私",
+  "pos": ["名詞", "代名詞", "一般", "*", "*", "*"],   // Ja/Kun Universal POS tag split on "-"
+  "dep": "nsubj",                                     // Universal Dependencies relation to its head
+  "dep_description": "nominal subject (the noun performing the action)",
+  "head_index": 2,                                    // null for the root token
+  "head_surface": "です",                             // null for the root token
+  "is_root": false                                    // true for the root token (head_index/head_surface null)
+}
+""")
 async def stream_ocr(
     chapter_id: UUID,
     user: CurrentUser,
@@ -207,3 +256,12 @@ async def reset_ocr(
             detail="No OCR result found for this chapter.",
         )
     return {"success": True}
+
+
+@router.post("/ocr/backfill-analysis", tags=["Manga"], description="Run GiNZA tokenization + dependency analysis on all existing OCR data that lacks it, and persist the augmented results")
+async def backfill_ocr_analysis_route(
+    user: CurrentUser,
+):
+    session = get_db_session()
+    processed = backfill_ocr_analysis(session)
+    return {"success": True, "chapters_processed": processed}

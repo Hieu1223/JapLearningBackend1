@@ -3,6 +3,8 @@ from typing import Optional, List, Union
 from uuid import UUID
 from datetime import datetime
 
+from ..tokenization.schema import DependencyTree
+
 
 # ─────────────────────────────────────────────────────────────
 # OCR
@@ -16,6 +18,8 @@ class OCRBlock(BaseModel):
     # lines_coords is a list of 4 points, each point is [x, y]
     lines_coords: List[List[List[float]]]
     lines: List[str]
+    # GiNZA tokenization + dependency analysis per line (parallel to `lines`)
+    analyze: Optional[List[List[DependencyTree]]] = None
 
 
 class OCRPage(BaseModel):
@@ -116,8 +120,10 @@ class OCRResultResponse(BaseModel):
     chapter_id: UUID
     ocr_date: datetime
     ocr_by: Optional[OCRUserInfo]
-    manga: MangaPreview
     ocr_data: OCRResponse
+    total_pages: int
+    offset: int
+    limit: int
 
 
 # ─────────────────────────────────────────────────────────────

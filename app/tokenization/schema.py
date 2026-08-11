@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import List, Tuple, Optional
 from uuid import UUID
+from datetime import datetime
 
 
 class WordEntry(BaseModel):
@@ -69,3 +70,26 @@ class DependencyTree(BaseModel):
 class DependencyTreeResponse(BaseModel):
     text: str
     sentences: List[DependencyTree]
+
+
+class TokenizeDependenciesRequest(BaseModel):
+    text: str
+    user_id: UUID
+
+
+class TokenizeDependenciesResponse(BaseModel):
+    history_id: UUID
+    text: str
+    sentences: List[DependencyTree]
+
+
+class TokenizationHistoryItem(BaseModel):
+    history_id: UUID
+    text: str
+    sentences: int
+    date_created: datetime
+
+
+class TokenizationHistoryListResponse(BaseModel):
+    items: List[TokenizationHistoryItem]
+    total: int

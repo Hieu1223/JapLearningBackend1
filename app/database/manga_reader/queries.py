@@ -337,3 +337,45 @@ def delete_ocr_result(session: Session, chapter_id: UUID) -> bool:
     session.delete(ocr_result)
     session.commit()
     return True
+
+
+# ─────────────────────────────────────────────────────────────
+# OCR BACKFILL (GiNZA analysis on existing OCR data)
+# ─────────────────────────────────────────────────────────────
+
+def get_all_ocr_results(session: Session) -> list[OCRResult]:
+    return list(session.exec(select(OCRResult)).all())
+
+
+def backfill_ocr_analysis(session: Session) -> int:
+    """Run GiNZA tokenization + dependency analysis on every stored OCR result
+    that does not already carry analysis data, and persist it back into
+    ``ocr_data``. Returns the number of chapters processed.
+    """
+    from ...manga_reader.manga_ocr import analyze_ocr_page
+    from ...manga_reader.schema import OCRPage
+
+    count = 0
+    for ocr_result in get_all_ocr_results(session):
+        data = json.loads(ocr_result.ocr_data)
+        pages = data.get("pages", [])
+        # A page needs (re)analysis if any block is missing its `analyze`.
+        needs_analysis = any(
+            any("analyze" not in block for block in page.get("blocks", []))
+            for page in pages
+        )
+        if not needs_analysis:
+            continue
+
+        analyzed_pages = []
+        for page in pages:
+            page.pop("analyze", None)  # page-level analysis is redundant; block-level is authoritative
+            analyzed_pages.append(analyze_ocr_page(OCRPage.model_validate(page)).model_dump())
+
+        ocr_result.ocr_data = json.dumps({"pages": analyzed_pages})
+        session.add(ocr_result)
+        count += 1
+
+    if count:
+        session.commit()
+    return count

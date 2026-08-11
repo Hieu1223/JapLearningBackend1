@@ -7,6 +7,7 @@ from .user import User
 from .transcription import Transcript,TranscriptionHistory
 from .manga_reader import *
 from .security import *
+from .tokenization import TokenizationHistory
 
 
 

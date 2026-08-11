@@ -1,7 +1,8 @@
 import modal
 from typing import AsyncIterator
 
-from .schema import OCRPage
+from ..tokenization.tokenize import build_dependency_tree
+from .schema import OCRPage, OCRBlock
 
 # Initialize the remote Modal class
 ocr = modal.Cls.from_name("manga-ocr-threaded-app", "OCR")()
@@ -19,3 +20,30 @@ async def do_ocr_stream(image_urls: list[str]) -> AsyncIterator[dict]:
         for page in batch:
             validated = OCRPage.model_validate(page).model_dump()
             yield validated
+
+
+def _analyze_lines(lines: list[str]) -> list[list[dict]]:
+    """Run GiNZA tokenization + dependency analysis on each OCR line.
+
+    Returns a list (one per line) of dependency trees (as dicts) so it can be
+    stored alongside the OCR data as JSON.
+    """
+    return [
+        [tree.model_dump() for tree in build_dependency_tree(line)]
+        for line in lines
+        if line.strip()
+    ]
+
+
+def analyze_ocr_page(page: OCRPage) -> OCRPage:
+    """Augment each OCR block with GiNZA tokenization + dependency analysis.
+
+    Analysis is computed per block line (the natural manga text layout) and
+    attached to the block. No page-level analysis is stored to avoid duplicate
+    data.
+    """
+    for block in page.blocks:
+        if block.lines:
+            block.analyze = _analyze_lines(block.lines)
+
+    return page

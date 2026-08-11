@@ -28,7 +28,7 @@ from .schema import (
     OCRUserInfo,
     ReadHistoryResponse,
 )
-from .manga_ocr import do_ocr_stream
+from .manga_ocr import do_ocr_stream, analyze_ocr_page
 
 
 def _manga_preview(manga) -> MangaPreview:
@@ -123,6 +123,8 @@ class MangaReaderService:
         self,
         session: Session,
         chapter_id: UUID,
+        offset: int = 0,
+        limit: int = 50,
     ) -> Optional[OCRResultResponse]:
         row = get_ocr_result_with_user(session, chapter_id)
         if not row:
@@ -130,20 +132,20 @@ class MangaReaderService:
 
         ocr_result, user = row
 
-        chapter = get_chapter_by_id(session, chapter_id)
-        if not chapter:
-            return None
-
-        manga = get_manga_by_id(session, chapter.manga_id)
-        if not manga:
-            return None
+        full = json.loads(ocr_result.ocr_data)
+        all_pages = full.get("pages", [])
+        total_pages = len(all_pages)
+        window = all_pages[offset : offset + limit]
+        paged = {**full, "pages": window}
 
         return OCRResultResponse(
             chapter_id=chapter_id,
             ocr_date=ocr_result.ocr_date,
             ocr_by=OCRUserInfo(id=user.id, display_name=user.display_name) if user else None,
-            manga=_manga_preview(manga),
-            ocr_data=OCRResponse.model_validate(json.loads(ocr_result.ocr_data)),
+            ocr_data=OCRResponse.model_validate(paged),
+            total_pages=total_pages,
+            offset=offset,
+            limit=limit,
         )
 
     async def stream_ocr(
@@ -176,8 +178,10 @@ class MangaReaderService:
         background_tasks.add_task(_save_to_db)
 
         async for page in do_ocr_stream(image_urls):
-            accumulated.append(page)
-            yield f"data: {json.dumps(page)}\n\n"
+            validated = OCRPage.model_validate(page)
+            analyzed = analyze_ocr_page(validated)
+            accumulated.append(analyzed.model_dump())
+            yield f"data: {json.dumps(analyzed.model_dump())}\n\n"
 
         yield "data: [DONE]\n\n"
 
