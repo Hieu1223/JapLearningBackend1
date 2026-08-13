@@ -1,5 +1,6 @@
 .env
 /test
+/tests
 .venv
 /temp
 **/__pycache__/
