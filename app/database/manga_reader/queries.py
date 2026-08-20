@@ -122,6 +122,16 @@ def list_genres(
     return list(session.exec(stmt).all())
 
 
+def list_genres_by_ids(
+    session: Session,
+    genre_ids: list[int],
+) -> list[Genre]:
+    if not genre_ids:
+        return []
+    stmt = select(Genre).where(Genre.id.in_(genre_ids)).order_by(Genre.name)
+    return list(session.exec(stmt).all())
+
+
 def list_creators(
     session: Session,
     q: Optional[str] = None,

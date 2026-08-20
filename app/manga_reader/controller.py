@@ -17,7 +17,8 @@ from ..database.manga_reader.queries import (
     delete_ocr_result,
     get_read_histories,
     upsert_read_history,
-    delete_read_history
+    delete_read_history,
+    list_genres_by_ids,
 )
 from .schema import (
     OCRResponse,
@@ -25,6 +26,7 @@ from .schema import (
     MangaPreview,
     MangaDetail,
     ChapterPreview,
+    GenrePreview,
     ReadResponse,
     OCRResultResponse,
     OCRUserInfo,
@@ -95,6 +97,14 @@ def ctrl_get_manga_list(
 # AGGREGATE MANGA (detail + chapter list)
 # ─────────────────────────────────────────────────────────────
 
+def _genre_preview(genre) -> GenrePreview:
+    return GenrePreview(
+        id=genre.id,
+        slug=genre.slug,
+        name=genre.name,
+    )
+
+
 def ctrl_get_manga_detail(session: Session, manga_id: UUID) -> Optional[MangaDetail]:
     manga = get_manga_by_id(session, manga_id)
     if not manga:
@@ -109,6 +119,7 @@ def ctrl_get_manga_detail(session: Session, manga_id: UUID) -> Optional[MangaDet
         status=manga.status,
         description=manga.description,
         genre_ids=manga.genre_ids,
+        genres=[_genre_preview(g) for g in list_genres_by_ids(session, manga.genre_ids or [])],
         chapters=[_chapter_preview(c) for c in chapters],
     )
 

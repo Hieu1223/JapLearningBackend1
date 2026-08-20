@@ -53,6 +53,8 @@ class VisitedVideoResponse(BaseModel):
     resource_id: Optional[str] = None
     progress: float = 0.0
     updated_at: Optional[datetime] = None
+    status: int = 0
+    is_transcribed: bool = False
 
 
 class VisitedVideoListResponse(BaseModel):

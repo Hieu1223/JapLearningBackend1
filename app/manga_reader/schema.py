@@ -87,6 +87,15 @@ class MangaPreview(BaseModel):
         from_attributes = True
 
 
+class GenrePreview(BaseModel):
+    id: int
+    slug: str
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class MangaDetail(BaseModel):
     id: UUID
     title: str
@@ -97,6 +106,7 @@ class MangaDetail(BaseModel):
     description_native: Optional[str]
     manga_type: Optional[str]
     genre_ids: Optional[List[int]] = None
+    genres: List[GenrePreview] = []
     released: Optional[str]
     serialization: Optional[str]
     score: Optional[float]
@@ -119,15 +129,6 @@ class CreatorPreview(BaseModel):
     slug: str
     name: str
     role: str
-
-    class Config:
-        from_attributes = True
-
-
-class GenrePreview(BaseModel):
-    id: int
-    slug: str
-    name: str
 
     class Config:
         from_attributes = True

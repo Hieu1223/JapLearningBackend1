@@ -38,6 +38,14 @@ async def list_transcriptions(
     return _container.transcription_service.list_transcriptions(session, video_id, limit, offset)
 
 
+@router.get("/visited", response_model=VisitedVideoListResponse, tags=["Transcription"], description="List the current user's visited videos (derived from saved playback progress)")
+async def list_visited_videos(
+    user: CurrentUser,
+):
+    session = get_db_session()
+    return _container.transcription_service.get_visited_videos(session, user)
+
+
 @router.get("/{transcript_id}", response_model=TranscriptDetailResponse, tags=["Transcription"], description="Poll a transcription job by id; returns status, and the full transcript once finished")
 async def poll_transcription(
     transcript_id: UUID,
@@ -47,11 +55,3 @@ async def poll_transcription(
         return _container.transcription_service.poll_transcription(session, transcript_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.get("/visited", response_model=VisitedVideoListResponse, tags=["Transcription"], description="List the current user's visited videos (derived from saved playback progress)")
-async def list_visited_videos(
-    user: CurrentUser,
-):
-    session = get_db_session()
-    return _container.transcription_service.get_visited_videos(session, user)

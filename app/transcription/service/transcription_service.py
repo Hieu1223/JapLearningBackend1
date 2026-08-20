@@ -144,6 +144,8 @@ class TranscriptionService:
                 resource_id=v.resource_id if v else None,
                 progress=vp.progress,
                 updated_at=vp.updated_at,
+                status=v.status if v else 0,
+                is_transcribed=(v.status == TranscriptStatus.Finish.value) if v else False,
             )
             for vp, v in rows
         ]
