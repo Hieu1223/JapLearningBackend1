@@ -14,7 +14,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           }
@@ -28,7 +30,7 @@
           "tokenization"
         ],
         "summary": "Tokenize Endpoint",
-        "description": "Split Japanese input text into morphological tokens for further lookup or study",
+        "description": "Split Japanese input text into morphological tokens and build the GiNZA dependency tree for each sentence",
         "operationId": "tokenize_endpoint_tokenization_tokenize_get",
         "parameters": [
           {
@@ -52,6 +54,160 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tokenization/tokenize/save": {
+      "post": {
+        "tags": [
+          "tokenization",
+          "tokenization"
+        ],
+        "summary": "Save Tokenization",
+        "description": "Tokenize and build the dependency tree for the input text, then save both to the user's unified tokenization history and return them",
+        "operationId": "save_tokenization_tokenization_tokenize_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTokenizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveTokenizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/tokenization/tokenize/history": {
+      "get": {
+        "tags": [
+          "tokenization",
+          "tokenization"
+        ],
+        "summary": "Get Tokenization History",
+        "description": "Return the current user's saved tokenization history (tokens + dependency trees)",
+        "operationId": "get_tokenization_history_tokenization_tokenize_history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizationHistoryListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tokenization/tokenize/history/{history_id}": {
+      "delete": {
+        "tags": [
+          "tokenization",
+          "tokenization"
+        ],
+        "summary": "Delete Tokenization History",
+        "description": "Delete a single entry from the current user's tokenization history",
+        "operationId": "delete_tokenization_history_tokenization_tokenize_history__history_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "history_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "History Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -177,25 +333,24 @@
         "summary": "Refresh Access Token",
         "description": "Exchange a valid refresh token for a fresh access token",
         "operationId": "refresh_access_token_token_refresh_post",
-        "parameters": [
-          {
-            "name": "refresh_token",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
             }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Refresh Access Token Token Refresh Post"
                 }
               }
@@ -223,30 +378,24 @@
         "summary": "Revoke Token",
         "description": "Revoke a refresh token so it can no longer be used to obtain access tokens",
         "operationId": "revoke_token_token_revoke_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "refresh_token",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeTokenRequest"
+              }
             }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Revoke Token Token Revoke Post"
                 }
               }
@@ -262,7 +411,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/user/register": {
@@ -355,6 +509,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/user/settings": {
+      "get": {
+        "tags": [
+          "User Management",
+          "User Management",
+          "User Management"
+        ],
+        "summary": "Get User Settings",
+        "description": "Return the current user's saved settings",
+        "operationId": "get_user_settings_user_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "User Management",
+          "User Management",
+          "User Management"
+        ],
+        "summary": "Save User Settings",
+        "description": "Save (create or replace) the current user's settings",
+        "operationId": "save_user_settings_user_settings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveUserSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -583,6 +813,11 @@
         "summary": "List Users",
         "description": "List users with pagination support",
         "operationId": "list_users_user__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "offset",
@@ -633,151 +868,18 @@
         }
       }
     },
-    "/user/settings": {
-      "get": {
-        "tags": [
-          "User Management",
-          "User Management",
-          "User Management"
-        ],
-        "summary": "Get User Settings",
-        "description": "Return the current user's saved settings",
-        "operationId": "get_user_settings_user_settings_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserSettingsResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "User Management",
-          "User Management",
-          "User Management"
-        ],
-        "summary": "Save User Settings",
-        "description": "Save (create or replace) the current user's settings",
-        "operationId": "save_user_settings_user_settings_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveUserSettingsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserSettingsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/transcription/transcribe/{id}/detail": {
-      "get": {
-        "tags": [
-          "Transcription",
-          "Transcription"
-        ],
-        "summary": "Get Transcription Detail",
-        "description": "Fetch the full detail and transcript text for a single transcription by id",
-        "operationId": "get_transcription_detail_transcription_transcribe__id__detail_get",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TranscriptDetailResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/transcription/transcribe/{id}/settings": {
+    "/transcription": {
       "post": {
         "tags": [
           "Transcription",
           "Transcription"
         ],
-        "summary": "Save Individual Settings",
-        "description": "Save per-transcription user settings, such as display and playback preferences",
-        "operationId": "save_individual_settings_transcription_transcribe__id__settings_post",
+        "summary": "Submit Transcription Job",
+        "description": "Submit a transcription job for an already-previewed video by its video_id; the job is processed in the background",
+        "operationId": "submit_transcription_job_transcription_post",
         "security": [
           {
             "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Id"
-            }
           }
         ],
         "requestBody": {
@@ -785,7 +887,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SaveIndividualSettingsRequest"
+                "$ref": "#/components/schemas/SubmitTranscriptionRequest"
               }
             }
           }
@@ -796,9 +898,70 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Save Individual Settings Transcription Transcribe  Id  Settings Post"
+                  "$ref": "#/components/schemas/TranscriptionJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Transcription",
+          "Transcription"
+        ],
+        "summary": "List Transcriptions",
+        "description": "List the transcription attempts for a specific video, with their current status",
+        "operationId": "list_transcriptions_transcription_get",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Video Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriptionListResponse"
                 }
               }
             }
@@ -816,123 +979,27 @@
         }
       }
     },
-    "/transcription/transcribe/{id}/rerun": {
-      "post": {
+    "/transcription/{transcript_id}": {
+      "get": {
         "tags": [
           "Transcription",
           "Transcription"
         ],
-        "summary": "Rerun Transcription",
-        "description": "Re-queue an existing transcription to be re-processed from its source in the background",
-        "operationId": "rerun_transcription_transcription_transcribe__id__rerun_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
+        "summary": "Poll Transcription",
+        "description": "Poll a transcription job by id; returns status, and the full transcript once finished",
+        "operationId": "poll_transcription_transcription__transcript_id__get",
         "parameters": [
           {
-            "name": "id",
+            "name": "transcript_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Id"
+              "title": "Transcript Id"
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TranscriptRequestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/transcription/transcribe/youtube": {
-      "post": {
-        "tags": [
-          "Transcription",
-          "Transcription"
-        ],
-        "summary": "Transcribe From Site",
-        "description": "Submit a YouTube URL for transcription; the job is processed in the background",
-        "operationId": "transcribe_from_site_transcription_transcribe_youtube_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/YoutubeTranscriptRequestForm"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TranscriptRequestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/transcription/visit": {
-      "post": {
-        "tags": [
-          "Transcription",
-          "Transcription"
-        ],
-        "summary": "Visit Video",
-        "description": "Record a visit to a video and return any existing transcription detail for it",
-        "operationId": "visit_video_transcription_visit_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/YoutubeTranscriptRequestForm"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -954,30 +1021,25 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
-    "/transcription/history": {
+    "/transcription/visited": {
       "get": {
         "tags": [
           "Transcription",
           "Transcription"
         ],
-        "summary": "Get Transcription History",
-        "description": "Return the current user's list of transcription history entries",
-        "operationId": "get_transcription_history_transcription_history_get",
+        "summary": "List Visited Videos",
+        "description": "List the current user's visited videos (derived from saved playback progress)",
+        "operationId": "list_visited_videos_transcription_visited_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserHistoryListResponse"
+                  "$ref": "#/components/schemas/VisitedVideoListResponse"
                 }
               }
             }
@@ -988,31 +1050,36 @@
             "OAuth2PasswordBearer": []
           }
         ]
-      },
-      "delete": {
+      }
+    },
+    "/youtube/video/{video_id}": {
+      "get": {
         "tags": [
-          "Transcription",
-          "Transcription"
+          "YouTube",
+          "YouTube"
         ],
-        "summary": "Delete History Entry",
-        "description": "Delete a single transcription history entry owned by the current user",
-        "operationId": "delete_history_entry_transcription_history_delete",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RemoveHistoryRequest"
-              }
+        "summary": "Preview Video",
+        "description": "Preview a YouTube video and return its metadata plus the app-internal video uuid to use for transcription jobs",
+        "operationId": "preview_video_youtube_video__video_id__get",
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Video Id"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/VideoPreview"
+                }
               }
             }
           },
@@ -1026,23 +1093,18 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
-    "/transcription/progress": {
+    "/youtube/progress": {
       "get": {
         "tags": [
-          "Transcription",
-          "Transcription"
+          "YouTube",
+          "YouTube"
         ],
-        "summary": "Get Video Progress",
-        "description": "Return the saved playback progress for a resource, if any",
-        "operationId": "get_video_progress_transcription_progress_get",
+        "summary": "Get Video Progress Route",
+        "description": "Return the saved playback progress for a video (by app video id), if any",
+        "operationId": "get_video_progress_route_youtube_progress_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -1050,22 +1112,13 @@
         ],
         "parameters": [
           {
-            "name": "resource_id",
+            "name": "video_id",
             "in": "query",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Resource Id"
-            }
-          },
-          {
-            "name": "original_source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "Youtube",
-              "title": "Original Source"
+              "format": "uuid",
+              "title": "Video Id"
             }
           }
         ],
@@ -1083,7 +1136,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Get Video Progress Transcription Progress Get"
+                  "title": "Response Get Video Progress Route Youtube Progress Get"
                 }
               }
             }
@@ -1102,12 +1155,12 @@
       },
       "post": {
         "tags": [
-          "Transcription",
-          "Transcription"
+          "YouTube",
+          "YouTube"
         ],
-        "summary": "Save Video Progress",
-        "description": "Save the current playback progress for a resource for the current user",
-        "operationId": "save_video_progress_transcription_progress_post",
+        "summary": "Save Video Progress Route",
+        "description": "Save the current playback progress for a video (by app video id) for the current user",
+        "operationId": "save_video_progress_route_youtube_progress_post",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -1130,50 +1183,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VideoProgressResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/youtube/video/{video_id}": {
-      "get": {
-        "tags": [
-          "YouTube",
-          "YouTube"
-        ],
-        "summary": "Preview Video",
-        "description": "Return preview metadata (title, channel, thumbnail) for a YouTube video by id",
-        "operationId": "preview_video_youtube_video__video_id__get",
-        "parameters": [
-          {
-            "name": "video_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Video Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VideoPreview"
                 }
               }
             }
@@ -1275,29 +1284,29 @@
           "Decks"
         ],
         "summary": "Read Decks",
-        "description": "List every deck belonging to the current user, each enriched with live SRS counts (new, learning, review, relearning and due cards)",
+        "description": "List every deck belonging to the current user, each enriched with live SRS counts (new, learning and due cards)",
         "operationId": "read_decks_flashcard_decks_get",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/DeckWithStatsResponse"
                   },
+                  "type": "array",
                   "title": "Response Read Decks Flashcard Decks Get"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -1307,32 +1316,16 @@
         "summary": "Create Deck",
         "description": "Create a new, empty flashcard deck for the current user, optionally marking it public so others can copy it",
         "operationId": "create_deck_flashcard_decks_post",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "name",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeckRequest"
+              }
             }
           },
-          {
-            "name": "public",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Public"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1354,7 +1347,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/flashcard/decks/{deck_id}": {
@@ -1445,7 +1443,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1469,7 +1469,7 @@
           "Decks"
         ],
         "summary": "Get Deck Progress",
-        "description": "Compute the current SRS progress for a deck, reporting how many cards are new, in learning, in review, relearning and due for study",
+        "description": "Compute the current SRS progress for a deck, reporting how many cards are new, in learning, and due for study",
         "operationId": "get_deck_progress_flashcard_decks__deck_id__progress_get",
         "parameters": [
           {
@@ -1563,7 +1563,7 @@
           "Cards"
         ],
         "summary": "Add Vocab",
-        "description": "Add a vocabulary card to a deck by supplying the word and its meaning; the card is stored as a vocab card with a sorting id of the form <word>-vocab for ordering and duplicate detection, and its initial SRS scheduling data is seeded",
+        "description": "Add a vocabulary card to a deck by supplying the word and its meaning; the card is stored as a vocab card with a sorting id of the form \u003Cword\u003E-vocab for ordering and duplicate detection, and its initial SRS scheduling data is seeded",
         "operationId": "add_vocab_flashcard_decks__deck_id__cards_vocab_post",
         "security": [
           {
@@ -1657,7 +1657,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1715,7 +1717,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -1796,7 +1800,7 @@
           "Reviews"
         ],
         "summary": "Review Card",
-        "description": "Record the outcome of reviewing a card by saving its updated FSRS scheduling data (queue, due, interval, factor, reps, lapses, steps) and return the card with its new state",
+        "description": "Persist the ts-fsrs Card object computed by the frontend scheduler for a card and return the card with its new state",
         "operationId": "review_card_flashcard_cards__card_id__review_post",
         "security": [
           {
@@ -1849,15 +1853,15 @@
         }
       }
     },
-    "/manga/manga": {
+    "/manga": {
       "get": {
         "tags": [
           "Manga",
           "Manga"
         ],
         "summary": "List Manga",
-        "description": "List manga with optional text search and pagination",
-        "operationId": "list_manga_manga_manga_get",
+        "description": "List manga with optional text search, genre filter and pagination",
+        "operationId": "list_manga_manga_get",
         "parameters": [
           {
             "name": "q",
@@ -1874,6 +1878,77 @@
               ],
               "title": "Q"
             }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by one or more genre slugs or names",
+              "title": "Genres"
+            },
+            "description": "Filter by one or more genre slugs or names"
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by creator (author/artist) id",
+              "title": "Author"
+            },
+            "description": "Filter by creator (author/artist) id"
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort field: trending, alphabet (az), views (view), latest (updated_at), created (created_at)",
+              "default": "trending",
+              "title": "Order By"
+            },
+            "description": "Sort field: trending, alphabet (az), views (view), latest (updated_at), created (created_at)"
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction: asc or desc",
+              "default": "desc",
+              "title": "Order Dir"
+            },
+            "description": "Sort direction: asc or desc"
           },
           {
             "name": "limit",
@@ -1909,7 +1984,223 @@
                   "items": {
                     "$ref": "#/components/schemas/MangaPreview"
                   },
-                  "title": "Response List Manga Manga Manga Get"
+                  "title": "Response List Manga Manga Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manga/genres": {
+      "get": {
+        "tags": [
+          "Manga",
+          "Manga"
+        ],
+        "summary": "List Genres",
+        "description": "List manga genres from the database with optional prefix search, ordering and pagination",
+        "operationId": "list_genres_manga_genres_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive prefix filter on genre name or slug",
+              "title": "Q"
+            },
+            "description": "Case-insensitive prefix filter on genre name or slug"
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort order: az (A-Z), -az (Z-A)",
+              "default": "az",
+              "title": "Order By"
+            },
+            "description": "Sort order: az (A-Z), -az (Z-A)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GenrePreview"
+                  },
+                  "title": "Response List Genres Manga Genres Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manga/creators": {
+      "get": {
+        "tags": [
+          "Manga",
+          "Manga"
+        ],
+        "summary": "List Creators",
+        "description": "List manga creators (authors/artists) with optional name search, role filter and pagination",
+        "operationId": "list_creators_manga_creators_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive prefix filter on creator name or slug",
+              "title": "Q"
+            },
+            "description": "Case-insensitive prefix filter on creator name or slug"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by role: author or artist",
+              "title": "Role"
+            },
+            "description": "Filter by role: author or artist"
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort order: az (A-Z), -az (Z-A)",
+              "default": "az",
+              "title": "Order By"
+            },
+            "description": "Sort order: az (A-Z), -az (Z-A)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorPreview"
+                  },
+                  "title": "Response List Creators Manga Creators Get"
                 }
               }
             }
@@ -2024,7 +2315,7 @@
           "Manga"
         ],
         "summary": "Get Ocr",
-        "description": "Return a previously computed OCR result for a chapter",
+        "description": "Return a previously computed OCR result for a chapter, paginated by page using offset/limit to avoid loading the full (potentially huge) OCR payload at once",
         "operationId": "get_ocr_manga_ocr__chapter_id__get",
         "security": [
           {
@@ -2041,6 +2332,33 @@
               "format": "uuid",
               "title": "Chapter Id"
             }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Page offset into the chapter's OCR pages",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Page offset into the chapter's OCR pages"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Number of OCR pages to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Number of OCR pages to return"
           }
         ],
         "responses": {
@@ -2096,7 +2414,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -2120,7 +2440,7 @@
           "Manga"
         ],
         "summary": "Stream Ocr",
-        "description": "Stream OCR extraction progress for a chapter as server-sent events, persisting the result when complete",
+        "description": "Stream OCR extraction progress for a chapter as server-sent events (media_type text/event-stream), persisting the result when complete.\n\nEach event is a line \"data: \u003Cjson\u003E\\n\\n\" where \u003Cjson\u003E is an OCRPage augmented with GiNZA tokenization + dependency analysis:\n\n{\n  \"version\": \"1\",\n  \"img_width\": 100,\n  \"img_height\": 100,\n  \"analyze\": [ DependencyTree, ... ],          // page-level trees (one per sentence)\n  \"blocks\": [\n    {\n      \"box\": [x1, y1, x2, y2],\n      \"vertical\": false,\n      \"font_size\": 12.0,\n      \"lines_coords\": [ [ [x, y], ... ] ],       // 4 points per line\n      \"lines\": [\"私は学生です。\", \"これは本です。\"],\n      \"analyze\": [                               // one entry per line in `lines`\n        [ DependencyTree, ... ],\n        [ DependencyTree, ... ]\n      ]\n    }\n  ]\n}\n\nAfter all page events a final event \"data: [DONE]\\n\\n\" is emitted.\n\nA DependencyTree is:\n{\n  \"sentence_id\": 0,\n  \"text\": \"私は学生です。\",\n  \"tokens\": [ DependencyLink, ... ]\n}\n\nA DependencyLink (one per token, built by GiNZA) is:\n{\n  \"token_index\": 0,\n  \"surface\": \"私\",\n  \"reading\": \"わたし\",\n  \"lemma\": \"私\",\n  \"pos\": [\"名詞\", \"代名詞\", \"一般\", \"*\", \"*\", \"*\"],   // Ja/Kun Universal POS tag split on \"-\"\n  \"dep\": \"nsubj\",                                     // Universal Dependencies relation to its head\n  \"dep_description\": \"nominal subject (the noun performing the action)\",\n  \"head_index\": 2,                                    // null for the root token\n  \"head_surface\": \"です\",                             // null for the root token\n  \"is_root\": false                                    // true for the root token (head_index/head_surface null)\n}",
         "operationId": "stream_ocr_manga_ocr_stream__chapter_id__get",
         "security": [
           {
@@ -2144,7 +2464,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -2270,7 +2592,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -2318,7 +2642,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -2491,80 +2817,52 @@
             }
           }
         }
-      },
-      "patch": {
+      }
+    },
+    "/web-novel/history": {
+      "get": {
         "tags": [
           "Web Novel",
           "Web Novel"
         ],
-        "summary": "Update Chapter",
-        "description": "Replace the content of an existing chapter and return the updated chapter",
-        "operationId": "update_chapter_web_novel_chapters__chapter_id__patch",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chapter_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Chapter Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateChapterRequest"
-              }
-            }
-          }
-        },
+        "summary": "Get History",
+        "description": "Return the current user's web-novel reading history",
+        "operationId": "get_history_web_novel_history_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebNovelChapterResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "items": {
+                    "$ref": "#/components/schemas/WebNovelReadHistoryResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get History Web Novel History Get"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/web-novel/novels": {
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
       "post": {
         "tags": [
           "Web Novel",
           "Web Novel"
         ],
-        "summary": "Create Novel",
-        "description": "Create a new web novel record with the given author, publication date and summary",
-        "operationId": "create_novel_web_novel_novels_post",
+        "summary": "Upsert History",
+        "description": "Create or update the user's reading progress for a web novel chapter",
+        "operationId": "upsert_history_web_novel_history_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateWebNovelRequest"
+                "$ref": "#/components/schemas/WebNovelReadHistoryUpdate"
               }
             }
           },
@@ -2576,7 +2874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebNovelResponse"
+                  "$ref": "#/components/schemas/WebNovelReadHistoryResponse"
                 }
               }
             }
@@ -2599,15 +2897,15 @@
         ]
       }
     },
-    "/web-novel/novels/{novel_id}/chapters": {
-      "post": {
+    "/web-novel/history/{web_novel_id}": {
+      "delete": {
         "tags": [
           "Web Novel",
           "Web Novel"
         ],
-        "summary": "Create Chapter",
-        "description": "Append a new chapter to an existing novel and return the created chapter",
-        "operationId": "create_chapter_web_novel_novels__novel_id__chapters_post",
+        "summary": "Delete History",
+        "description": "Delete a web-novel reading-history entry by its novel id",
+        "operationId": "delete_history_web_novel_history__web_novel_id__delete",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -2615,33 +2913,23 @@
         ],
         "parameters": [
           {
-            "name": "novel_id",
+            "name": "web_novel_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Novel Id"
+              "title": "Web Novel Id"
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateChapterRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebNovelChapterResponse"
+
                 }
               }
             }
@@ -2659,15 +2947,14 @@
         }
       }
     },
-    "/web-novel/novels/request": {
-      "post": {
+    "/proxy": {
+      "get": {
         "tags": [
-          "Web Novel",
-          "Web Novel"
+          "Proxy"
         ],
-        "summary": "Request Novel",
-        "description": "Submit a web-novel URL to an external ingestion server to request that it be fetched and indexed; the request is dispatched asynchronously",
-        "operationId": "request_novel_web_novel_novels_request_post",
+        "summary": "Proxy",
+        "description": "Fetch a remote URL server-side and return its response.\n\nRequires authentication and refuses to reach private/loopback/link-local\naddresses (including cloud metadata endpoints) to prevent SSRF.",
+        "operationId": "proxy_proxy_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -2675,13 +2962,15 @@
         ],
         "parameters": [
           {
-            "name": "novel_url",
+            "name": "url",
             "in": "query",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Novel Url"
-            }
+              "description": "The absolute URL to fetch through the server",
+              "title": "Url"
+            },
+            "description": "The absolute URL to fetch through the server"
           }
         ],
         "responses": {
@@ -2689,7 +2978,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+
+                }
               }
             }
           },
@@ -2704,6 +2995,34 @@
             }
           }
         }
+      }
+    },
+    "/monitor/": {
+      "get": {
+        "tags": [
+          "Monitoring",
+          "Monitoring"
+        ],
+        "summary": "Monitor Server",
+        "description": "Report server-wide CPU and RAM usage of the running app",
+        "operationId": "monitor_server_monitor__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerMonitorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     }
   },
@@ -2846,8 +3165,15 @@
             "title": "Difficulty"
           },
           "due": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Due"
           },
           "last_review": {
@@ -2869,8 +3195,7 @@
           "deck_id",
           "data",
           "card_type",
-          "state",
-          "due"
+          "state"
         ],
         "title": "CardResponse"
       },
@@ -3084,65 +3409,96 @@
         ],
         "title": "ChapterPreview"
       },
-      "CreateChapterRequest": {
+      "CpuInfo": {
         "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
+          "percent": {
+            "type": "number",
+            "title": "Percent"
           },
-          "content": {
+          "cores_logical": {
+            "type": "integer",
+            "title": "Cores Logical"
+          },
+          "cores_physical": {
+            "type": "integer",
+            "title": "Cores Physical"
+          },
+          "load_avg": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Content"
+            "title": "Load Avg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "percent",
+          "cores_logical",
+          "cores_physical"
+        ],
+        "title": "CpuInfo"
+      },
+      "CreateDeckRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "The deck name"
+          },
+          "public": {
+            "type": "boolean",
+            "title": "Public",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "name"
         ],
-        "title": "CreateChapterRequest"
+        "title": "CreateDeckRequest"
       },
-      "CreateWebNovelRequest": {
+      "CreatorPreview": {
         "properties": {
-          "author": {
+          "id": {
             "type": "string",
-            "title": "Author"
+            "format": "uuid",
+            "title": "Id"
           },
-          "date_published": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Date Published"
+          "source_term_id": {
+            "type": "integer",
+            "title": "Source Term Id"
           },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
           }
         },
         "type": "object",
         "required": [
-          "author"
+          "id",
+          "source_term_id",
+          "slug",
+          "name",
+          "role"
         ],
-        "title": "CreateWebNovelRequest"
+        "title": "CreatorPreview"
       },
       "DeckProgressResponse": {
         "properties": {
@@ -3158,14 +3514,6 @@
             "type": "integer",
             "title": "Learning"
           },
-          "review": {
-            "type": "integer",
-            "title": "Review"
-          },
-          "relearning": {
-            "type": "integer",
-            "title": "Relearning"
-          },
           "due": {
             "type": "integer",
             "title": "Due"
@@ -3176,8 +3524,6 @@
           "total",
           "new",
           "learning",
-          "review",
-          "relearning",
           "due"
         ],
         "title": "DeckProgressResponse"
@@ -3224,16 +3570,6 @@
             "title": "Learning",
             "default": 0
           },
-          "review": {
-            "type": "integer",
-            "title": "Review",
-            "default": 0
-          },
-          "relearning": {
-            "type": "integer",
-            "title": "Relearning",
-            "default": 0
-          },
           "due": {
             "type": "integer",
             "title": "Due",
@@ -3276,6 +3612,134 @@
           "stats"
         ],
         "title": "DeckWithStatsResponse"
+      },
+      "DependencyLink": {
+        "properties": {
+          "token_index": {
+            "type": "integer",
+            "title": "Token Index"
+          },
+          "surface": {
+            "type": "string",
+            "title": "Surface"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          },
+          "lemma": {
+            "type": "string",
+            "title": "Lemma"
+          },
+          "pos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pos"
+          },
+          "dep": {
+            "type": "string",
+            "title": "Dep"
+          },
+          "dep_description": {
+            "type": "string",
+            "title": "Dep Description"
+          },
+          "head_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Index"
+          },
+          "head_surface": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Surface"
+          },
+          "is_root": {
+            "type": "boolean",
+            "title": "Is Root",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "token_index",
+          "surface",
+          "lemma",
+          "pos",
+          "dep",
+          "dep_description"
+        ],
+        "title": "DependencyLink"
+      },
+      "DependencyTree": {
+        "properties": {
+          "sentence_id": {
+            "type": "integer",
+            "title": "Sentence Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyLink"
+            },
+            "type": "array",
+            "title": "Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sentence_id",
+          "text",
+          "tokens"
+        ],
+        "title": "DependencyTree"
+      },
+      "GenrePreview": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "GenrePreview"
       },
       "HTTPValidationError": {
         "properties": {
@@ -3323,6 +3787,17 @@
             ],
             "title": "Status"
           },
+          "alternative_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Title"
+          },
           "description": {
             "anyOf": [
               {
@@ -3334,7 +3809,7 @@
             ],
             "title": "Description"
           },
-          "genres": {
+          "description_native": {
             "anyOf": [
               {
                 "type": "string"
@@ -3343,7 +3818,141 @@
                 "type": "null"
               }
             ],
-            "title": "Genres"
+            "title": "Description Native"
+          },
+          "manga_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manga Type"
+          },
+          "genre_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre Ids"
+          },
+          "released": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released"
+          },
+          "serialization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serialization"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "views_daily": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views Daily"
+          },
+          "views_weekly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views Weekly"
+          },
+          "views_monthly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views Monthly"
+          },
+          "reader_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reader Count"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "creators": {
+            "items": {
+              "$ref": "#/components/schemas/CreatorPreview"
+            },
+            "type": "array",
+            "title": "Creators",
+            "default": []
           },
           "chapters": {
             "items": {
@@ -3359,8 +3968,19 @@
           "title",
           "cover",
           "status",
+          "alternative_title",
           "description",
-          "genres",
+          "description_native",
+          "manga_type",
+          "released",
+          "serialization",
+          "score",
+          "views_daily",
+          "views_weekly",
+          "views_monthly",
+          "reader_count",
+          "published_at",
+          "updated_at",
           "chapters"
         ],
         "title": "MangaDetail"
@@ -3397,6 +4017,87 @@
               }
             ],
             "title": "Status"
+          },
+          "alternative_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "genre_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre Ids"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "views_weekly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views Weekly"
+          },
+          "reader_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reader Count"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -3404,9 +4105,43 @@
           "id",
           "title",
           "cover",
-          "status"
+          "status",
+          "alternative_title",
+          "description",
+          "score",
+          "views_weekly",
+          "reader_count",
+          "updated_at"
         ],
         "title": "MangaPreview"
+      },
+      "MemoryInfo": {
+        "properties": {
+          "total_bytes": {
+            "type": "integer",
+            "title": "Total Bytes"
+          },
+          "available_bytes": {
+            "type": "integer",
+            "title": "Available Bytes"
+          },
+          "used_bytes": {
+            "type": "integer",
+            "title": "Used Bytes"
+          },
+          "percent": {
+            "type": "number",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_bytes",
+          "available_bytes",
+          "used_bytes",
+          "percent"
+        ],
+        "title": "MemoryInfo"
       },
       "OCRBlock": {
         "properties": {
@@ -3444,6 +4179,23 @@
             },
             "type": "array",
             "title": "Lines"
+          },
+          "analyze": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "$ref": "#/components/schemas/DependencyTree"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyze"
           }
         },
         "type": "object",
@@ -3525,11 +4277,20 @@
               }
             ]
           },
-          "manga": {
-            "$ref": "#/components/schemas/MangaPreview"
-          },
           "ocr_data": {
             "$ref": "#/components/schemas/OCRResponse"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
           }
         },
         "type": "object",
@@ -3537,8 +4298,10 @@
           "chapter_id",
           "ocr_date",
           "ocr_by",
-          "manga",
-          "ocr_data"
+          "ocr_data",
+          "total_pages",
+          "offset",
+          "limit"
         ],
         "title": "OCRResultResponse"
       },
@@ -3567,6 +4330,49 @@
           "display_name"
         ],
         "title": "OCRUserInfo"
+      },
+      "ProcessInfo": {
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "title": "Pid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "cpu_percent": {
+            "type": "number",
+            "title": "Cpu Percent"
+          },
+          "memory_rss_bytes": {
+            "type": "integer",
+            "title": "Memory Rss Bytes"
+          },
+          "memory_vms_bytes": {
+            "type": "integer",
+            "title": "Memory Vms Bytes"
+          },
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pid",
+          "name",
+          "cpu_percent",
+          "memory_rss_bytes",
+          "memory_vms_bytes",
+          "threads",
+          "uptime_seconds"
+        ],
+        "title": "ProcessInfo"
       },
       "PublicDeckResponse": {
         "properties": {
@@ -3721,6 +4527,19 @@
         ],
         "title": "ReadResponse"
       },
+      "RefreshTokenRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshTokenRequest"
+      },
       "RegisterRequest": {
         "properties": {
           "username": {
@@ -3750,20 +4569,6 @@
         ],
         "title": "RegisterRequest"
       },
-      "RemoveHistoryRequest": {
-        "properties": {
-          "history_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "History Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "history_id"
-        ],
-        "title": "RemoveHistoryRequest"
-      },
       "ReviewSessionWithSrsResponse": {
         "properties": {
           "cards": {
@@ -3785,73 +4590,76 @@
         ],
         "title": "ReviewSessionWithSrsResponse"
       },
-      "SaveIndividualSettingsRequest": {
+      "RevokeTokenRequest": {
         "properties": {
-          "transcript_id": {
+          "refresh_token": {
             "type": "string",
-            "format": "uuid",
-            "title": "Transcript Id"
-          },
-          "settings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Settings"
+            "title": "Refresh Token"
           }
         },
         "type": "object",
         "required": [
-          "transcript_id",
-          "settings"
+          "refresh_token"
         ],
-        "title": "SaveIndividualSettingsRequest"
+        "title": "RevokeTokenRequest"
       },
       "SaveReviewRequest": {
         "properties": {
-          "queue": {
-            "type": "integer",
-            "title": "Queue"
-          },
-          "due": {
-            "type": "integer",
-            "title": "Due"
-          },
-          "ivl": {
-            "type": "integer",
-            "title": "Ivl"
-          },
-          "factor": {
-            "type": "integer",
-            "title": "Factor"
-          },
-          "reps": {
-            "type": "integer",
-            "title": "Reps"
-          },
-          "lapses": {
-            "type": "integer",
-            "title": "Lapses"
-          },
-          "left": {
-            "type": "integer",
-            "title": "Left"
-          },
-          "data": {
-            "type": "string",
-            "title": "Data",
-            "default": "{}"
+          "card": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Card"
           }
         },
         "type": "object",
         "required": [
-          "queue",
-          "due",
-          "ivl",
-          "factor",
-          "reps",
-          "lapses",
-          "left"
+          "card"
         ],
-        "title": "SaveReviewRequest"
+        "title": "SaveReviewRequest",
+        "description": "Payload from the frontend ts-fsrs scheduler.\n\n``card`` is the full ts-fsrs ``Card`` object (dates as ISO strings or\nepoch-ms). The backend persists its fields into the fsrs-native SrsCard."
+      },
+      "SaveTokenizationRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SaveTokenizationRequest"
+      },
+      "SaveTokenizationResponse": {
+        "properties": {
+          "history_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "History Id"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            },
+            "type": "array",
+            "title": "Tokens"
+          },
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyTree"
+            },
+            "type": "array",
+            "title": "Sentences"
+          }
+        },
+        "type": "object",
+        "required": [
+          "history_id",
+          "tokens",
+          "sentences"
+        ],
+        "title": "SaveTokenizationResponse"
       },
       "SaveUserSettingsRequest": {
         "properties": {
@@ -3869,26 +4677,71 @@
       },
       "SaveVideoProgressRequest": {
         "properties": {
-          "resource_id": {
+          "video_id": {
             "type": "string",
-            "title": "Resource Id"
+            "format": "uuid",
+            "title": "Video Id"
           },
-          "original_source": {
-            "type": "string",
-            "title": "Original Source"
-          },
-          "current_page": {
-            "type": "integer",
-            "title": "Current Page"
+          "progress": {
+            "type": "number",
+            "title": "Progress"
           }
         },
         "type": "object",
         "required": [
-          "resource_id",
-          "original_source",
-          "current_page"
+          "video_id",
+          "progress"
         ],
         "title": "SaveVideoProgressRequest"
+      },
+      "ServerMonitorResponse": {
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "title": "Hostname"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "timestamp": {
+            "type": "number",
+            "title": "Timestamp"
+          },
+          "cpu": {
+            "$ref": "#/components/schemas/CpuInfo"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryInfo"
+          },
+          "process": {
+            "$ref": "#/components/schemas/ProcessInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hostname",
+          "platform",
+          "timestamp",
+          "cpu",
+          "memory",
+          "process"
+        ],
+        "title": "ServerMonitorResponse"
+      },
+      "SubmitTranscriptionRequest": {
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Video Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_id"
+        ],
+        "title": "SubmitTranscriptionRequest"
       },
       "Token": {
         "properties": {
@@ -3937,6 +4790,72 @@
           "end": {
             "type": "integer",
             "title": "End"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop"
+          },
+          "dep": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dep"
+          },
+          "dep_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dep Description"
+          },
+          "head_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Index"
+          },
+          "head_surface": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Surface"
           }
         },
         "type": "object",
@@ -3960,6 +4879,14 @@
             },
             "type": "array",
             "title": "Tokens"
+          },
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyTree"
+            },
+            "type": "array",
+            "title": "Sentences",
+            "default": []
           }
         },
         "type": "object",
@@ -3968,42 +4895,56 @@
         ],
         "title": "TokenList"
       },
-      "TokenTimestamp": {
+      "TokenizationHistoryItem": {
         "properties": {
-          "start": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End"
-          },
-          "token": {
+          "history_id": {
             "type": "string",
-            "title": "Token"
+            "format": "uuid",
+            "title": "History Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sentence_count": {
+            "type": "integer",
+            "title": "Sentence Count"
+          },
+          "date_created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Date Created"
           }
         },
         "type": "object",
         "required": [
-          "start",
-          "end",
-          "token"
+          "history_id",
+          "text",
+          "sentence_count",
+          "date_created"
         ],
-        "title": "TokenTimestamp"
+        "title": "TokenizationHistoryItem"
+      },
+      "TokenizationHistoryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TokenizationHistoryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "TokenizationHistoryListResponse"
       },
       "TranscriptDetailResponse": {
         "properties": {
@@ -4011,29 +4952,6 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
-          },
-          "original_source": {
-            "type": "string",
-            "title": "Original Source"
-          },
-          "thumnail_url": {
-            "type": "string",
-            "title": "Thumnail Url"
-          },
-          "resource_url": {
-            "type": "string",
-            "title": "Resource Url"
-          },
-          "resource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resource Id"
           },
           "status": {
             "type": "integer",
@@ -4047,16 +4965,6 @@
             "type": "string",
             "title": "Msg"
           },
-          "video": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VideoDetail"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "data": {
             "anyOf": [
               {
@@ -4066,34 +4974,37 @@
                 "type": "null"
               }
             ]
-          },
-          "individual_settings": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Individual Settings"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "original_source",
-          "thumnail_url",
-          "resource_url",
-          "resource_id",
           "status",
           "done",
           "msg"
         ],
         "title": "TranscriptDetailResponse"
       },
-      "TranscriptRequestResponse": {
+      "TranscriptResult": {
+        "properties": {
+          "segments": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/Token"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Segments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segments"
+        ],
+        "title": "TranscriptResult"
+      },
+      "TranscriptionJobResponse": {
         "properties": {
           "transcript_id": {
             "type": "string",
@@ -4110,44 +5021,95 @@
           "transcript_id",
           "success"
         ],
-        "title": "TranscriptRequestResponse"
+        "title": "TranscriptionJobResponse"
       },
-      "TranscriptResult": {
+      "TranscriptionListItem": {
         "properties": {
-          "segments": {
-            "items": {
-              "$ref": "#/components/schemas/TranscriptSegment"
-            },
-            "type": "array",
-            "title": "Segments"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segments"
-        ],
-        "title": "TranscriptResult"
-      },
-      "TranscriptSegment": {
-        "properties": {
-          "text": {
+          "transcript_id": {
             "type": "string",
-            "title": "Text"
+            "format": "uuid",
+            "title": "Transcript Id"
           },
-          "words": {
-            "items": {
-              "$ref": "#/components/schemas/TokenTimestamp"
-            },
-            "type": "array",
-            "title": "Words"
+          "video_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Video Id"
+          },
+          "original_source": {
+            "type": "string",
+            "title": "Original Source"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
           }
         },
         "type": "object",
         "required": [
-          "text",
-          "words"
+          "transcript_id",
+          "video_id",
+          "original_source",
+          "name",
+          "status",
+          "done",
+          "msg"
         ],
-        "title": "TranscriptSegment"
+        "title": "TranscriptionListItem"
+      },
+      "TranscriptionListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptionListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "TranscriptionListResponse"
       },
       "UpdateUserPartialRequest": {
         "properties": {
@@ -4182,91 +5144,6 @@
         },
         "type": "object",
         "title": "UpdateUserRequest"
-      },
-      "UserHistoryListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/UserHistoryResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total"
-        ],
-        "title": "UserHistoryListResponse"
-      },
-      "UserHistoryResponse": {
-        "properties": {
-          "history_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "History Id"
-          },
-          "transcript_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transcript Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "thumbnail_url": {
-            "type": "string",
-            "title": "Thumbnail Url"
-          },
-          "original_source": {
-            "type": "string",
-            "title": "Original Source"
-          },
-          "date_created": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Date Created"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          },
-          "is_transcribed": {
-            "type": "boolean",
-            "title": "Is Transcribed",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "history_id",
-          "transcript_id",
-          "name",
-          "thumbnail_url",
-          "original_source",
-          "date_created"
-        ],
-        "title": "UserHistoryResponse"
       },
       "UserResponse": {
         "properties": {
@@ -4372,58 +5249,6 @@
         ],
         "title": "ValidationError"
       },
-      "VideoDetail": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url"
-          },
-          "channel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Channel"
-          },
-          "duration": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duration"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title",
-          "thumbnail_url"
-        ],
-        "title": "VideoDetail"
-      },
       "VideoPreview": {
         "properties": {
           "id": {
@@ -4480,6 +5305,23 @@
               }
             ],
             "title": "View Count"
+          },
+          "app_video_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Video Id"
+          },
+          "has_transcript": {
+            "type": "boolean",
+            "title": "Has Transcript",
+            "default": false
           }
         },
         "type": "object",
@@ -4495,17 +5337,14 @@
       },
       "VideoProgressResponse": {
         "properties": {
-          "resource_id": {
+          "video_id": {
             "type": "string",
-            "title": "Resource Id"
+            "format": "uuid",
+            "title": "Video Id"
           },
-          "original_source": {
-            "type": "string",
-            "title": "Original Source"
-          },
-          "current_page": {
-            "type": "integer",
-            "title": "Current Page"
+          "progress": {
+            "type": "number",
+            "title": "Progress"
           },
           "updated_at": {
             "type": "string",
@@ -4515,12 +5354,107 @@
         },
         "type": "object",
         "required": [
-          "resource_id",
-          "original_source",
-          "current_page",
+          "video_id",
+          "progress",
           "updated_at"
         ],
         "title": "VideoProgressResponse"
+      },
+      "VisitedVideoListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VisitedVideoResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "VisitedVideoListResponse"
+      },
+      "VisitedVideoResponse": {
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Video Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "original_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Source"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "progress": {
+            "type": "number",
+            "title": "Progress",
+            "default": 0
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_id"
+        ],
+        "title": "VisitedVideoResponse"
       },
       "WebNovelChapterResponse": {
         "properties": {
@@ -4557,6 +5491,64 @@
           "updated_at"
         ],
         "title": "WebNovelChapterResponse"
+      },
+      "WebNovelReadHistoryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "web_novel_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Web Novel Id"
+          },
+          "chapter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chapter Id"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "web_novel_id",
+          "chapter_id",
+          "updated_at"
+        ],
+        "title": "WebNovelReadHistoryResponse"
+      },
+      "WebNovelReadHistoryUpdate": {
+        "properties": {
+          "web_novel_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Web Novel Id"
+          },
+          "chapter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chapter Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "web_novel_id",
+          "chapter_id"
+        ],
+        "title": "WebNovelReadHistoryUpdate"
       },
       "WebNovelResponse": {
         "properties": {
@@ -4661,56 +5653,6 @@
           "total"
         ],
         "title": "WordLookupResponse"
-      },
-      "YoutubeTranscriptRequestForm": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "resource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resource Id"
-          },
-          "original_source": {
-            "type": "string",
-            "title": "Original Source",
-            "default": "Youtube"
-          },
-          "public": {
-            "type": "boolean",
-            "title": "Public",
-            "default": true
-          },
-          "thumbnail_url": {
-            "type": "string",
-            "title": "Thumbnail Url"
-          },
-          "resource_url": {
-            "type": "string",
-            "title": "Resource Url"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "thumbnail_url",
-          "resource_url",
-          "user_id"
-        ],
-        "title": "YoutubeTranscriptRequestForm"
       }
     },
     "securitySchemes": {
@@ -4718,7 +5660,9 @@
         "type": "oauth2",
         "flows": {
           "password": {
-            "scopes": {},
+            "scopes": {
+
+            },
             "tokenUrl": "token"
           }
         }
