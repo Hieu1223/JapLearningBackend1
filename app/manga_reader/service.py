@@ -1,27 +1,35 @@
 import json
 from uuid import UUID
 from typing import Optional, AsyncIterator
-from sqlmodel import Session
+from sqlmodel import Session, select
+from datetime import datetime, timezone
 from fastapi import BackgroundTasks
 
 from ..database.manga_reader.queries import (
     get_manga_list,
     search_manga,
     get_manga_by_id,
+    get_manga_creators,
     get_chapter_by_id,
     get_chapters_for_manga,
+    list_genres,
+    list_creators,
     get_ocr_result_with_user,
-    save_ocr_result,
+    save_ocr_page,
     delete_ocr_result,
     get_read_histories,
     upsert_read_history,
     delete_read_history,
     delete_read_history_by_id,
 )
+from ..database.user.schema import User
 from .schema import (
     OCRResponse,
+    OCRPage,
     MangaPreview,
     MangaDetail,
+    CreatorPreview,
+    GenrePreview,
     ChapterPreview,
     ReadResponse,
     OCRResultResponse,
@@ -37,6 +45,13 @@ def _manga_preview(manga) -> MangaPreview:
         title=manga.title,
         cover=manga.cover,
         status=manga.status,
+        alternative_title=manga.alternative_title,
+        description=manga.description,
+        genre_ids=manga.genre_ids,
+        score=manga.score,
+        views_weekly=manga.views_weekly,
+        reader_count=manga.reader_count,
+        updated_at=manga.updated_at,
     )
 
 
@@ -46,6 +61,24 @@ def _chapter_preview(chapter) -> ChapterPreview:
         title=chapter.title,
         chapter_index=chapter.chapter_index,
         date=chapter.date,
+    )
+
+
+def _creator_preview(creator) -> CreatorPreview:
+    return CreatorPreview(
+        id=creator.id,
+        source_term_id=creator.source_term_id,
+        slug=creator.slug,
+        name=creator.name,
+        role=creator.role,
+    )
+
+
+def _genre_preview(genre) -> GenrePreview:
+    return GenrePreview(
+        id=genre.id,
+        slug=genre.slug,
+        name=genre.name,
     )
 
 
@@ -73,13 +106,38 @@ class MangaReaderService:
         limit: int,
         offset: int,
         tags: Optional[list[str]] = None,
+        author: Optional[UUID] = None,
         order_by: Optional[str] = None,
+        order_dir: str = "desc",
     ) -> list[MangaPreview]:
         if query:
-            mangas = search_manga(session, query, limit, offset, tags=tags, order_by=order_by)
+            mangas = search_manga(session, query, limit, offset, tags=tags, author=author, order_by=order_by, order_dir=order_dir)
         else:
-            mangas = get_manga_list(session, limit, offset, tags=tags, order_by=order_by)
+            mangas = get_manga_list(session, limit, offset, tags=tags, author=author, order_by=order_by, order_dir=order_dir)
         return [_manga_preview(m) for m in mangas]
+
+    def get_genres(
+        self,
+        session: Session,
+        q: Optional[str] = None,
+        order_by: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[GenrePreview]:
+        genres = list_genres(session, q=q, order_by=order_by, limit=limit, offset=offset)
+        return [_genre_preview(g) for g in genres]
+
+    def get_creators(
+        self,
+        session: Session,
+        q: Optional[str] = None,
+        role: Optional[str] = None,
+        order_by: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[CreatorPreview]:
+        creators = list_creators(session, q=q, role=role, order_by=order_by, limit=limit, offset=offset)
+        return [_creator_preview(c) for c in creators]
 
     def get_manga_detail(self, session: Session, manga_id: UUID) -> Optional[MangaDetail]:
         manga = get_manga_by_id(session, manga_id)
@@ -87,14 +145,28 @@ class MangaReaderService:
             return None
 
         chapters = get_chapters_for_manga(session, manga_id)
+        creators = get_manga_creators(session, manga_id)
 
         return MangaDetail(
             id=manga.id,
             title=manga.title,
             cover=manga.cover,
             status=manga.status,
+            alternative_title=manga.alternative_title,
             description=manga.description,
-            genres=manga.genres,
+            description_native=manga.description_native,
+            manga_type=manga.manga_type,
+            genre_ids=manga.genre_ids,
+            released=manga.released,
+            serialization=manga.serialization,
+            score=manga.score,
+            views_daily=manga.views_daily,
+            views_weekly=manga.views_weekly,
+            views_monthly=manga.views_monthly,
+            reader_count=manga.reader_count,
+            published_at=manga.published_at,
+            updated_at=manga.updated_at,
+            creators=[_creator_preview(c) for c in creators],
             chapters=[_chapter_preview(c) for c in chapters],
         )
 
@@ -126,23 +198,23 @@ class MangaReaderService:
         offset: int = 0,
         limit: int = 50,
     ) -> Optional[OCRResultResponse]:
-        row = get_ocr_result_with_user(session, chapter_id)
+        row = get_ocr_result_with_user(session, chapter_id, offset, limit)
         if not row:
             return None
 
-        ocr_result, user = row
+        window, ocr_by = row
+        user = session.get(User, ocr_by) if ocr_by else None
 
-        full = json.loads(ocr_result.ocr_data)
-        all_pages = full.get("pages", [])
-        total_pages = len(all_pages)
-        window = all_pages[offset : offset + limit]
-        paged = {**full, "pages": window}
+        all_pages = [json.loads(p.ocr_data) for p in window]
+        total_pages = session.exec(
+            select(OCRResult).where(OCRResult.chapter_id == chapter_id)
+        ).count()
 
         return OCRResultResponse(
             chapter_id=chapter_id,
-            ocr_date=ocr_result.ocr_date,
+            ocr_date=window[-1].ocr_date if window else datetime.now(timezone.utc),
             ocr_by=OCRUserInfo(id=user.id, display_name=user.display_name) if user else None,
-            ocr_data=OCRResponse.model_validate(paged),
+            ocr_data=OCRResponse(pages=[OCRPage.model_validate(p) for p in all_pages]),
             total_pages=total_pages,
             offset=offset,
             limit=limit,
@@ -165,22 +237,24 @@ class MangaReaderService:
         if not image_urls:
             raise ValueError("Chapter has no pages to OCR")
 
-        accumulated: list[dict] = []
+        accumulated: list[tuple[int, dict]] = []
 
         def _save_to_db():
-            save_ocr_result(
-                session,
-                chapter_id=chapter_id,
-                ocr_data=json.dumps({"pages": accumulated}),
-                ocr_by=user_id,
-            )
+            for page_number, analyzed in accumulated:
+                save_ocr_page(
+                    session,
+                    chapter_id=chapter_id,
+                    page_number=page_number,
+                    ocr_data=json.dumps(analyzed),
+                    ocr_by=user_id,
+                )
 
         background_tasks.add_task(_save_to_db)
 
-        async for page in do_ocr_stream(image_urls):
+        async for idx, page in enumerate(do_ocr_stream(image_urls)):
             validated = OCRPage.model_validate(page)
             analyzed = analyze_ocr_page(validated)
-            accumulated.append(analyzed.model_dump())
+            accumulated.append((idx, analyzed.model_dump()))
             yield f"data: {json.dumps(analyzed.model_dump())}\n\n"
 
         yield "data: [DONE]\n\n"

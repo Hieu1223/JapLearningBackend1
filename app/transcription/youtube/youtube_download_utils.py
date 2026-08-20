@@ -42,7 +42,7 @@ def get_video_id(url):
         # The 'id' field contains the video ID
         video_id = info_dict.get("id", None)
         return video_id
-    
+
 
 def yt_search(query, max_results=5):
     """

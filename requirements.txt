@@ -72,3 +72,4 @@ bcrypt
 numpy
 yt-dlp
 jaconv
+psutil

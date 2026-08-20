@@ -4,32 +4,54 @@ from uuid import UUID
 from datetime import datetime, timezone
 from typing import Optional
 
-from .schema import Manga, Chapter, OCRResult, ReadHistory, User
+from .schema import Manga, Chapter, OCRResult, ReadHistory, Genre, Creator, MangaCreator
+from ..user.schema import User
 
 
 # ─────────────────────────────────────────────────────────────
 # MANGA
 # ─────────────────────────────────────────────────────────────
 
-def _apply_manga_filters(stmt, query: Optional[str], tags: Optional[list[str]]):
+def _apply_manga_filters(
+    stmt,
+    query: Optional[str],
+    tags: Optional[list[str]],
+    author: Optional[UUID] = None,
+):
     if query:
         stmt = stmt.where(Manga.title.ilike(f"%{query}%"))
     if tags:
-        for tag in tags:
-            stmt = stmt.where(Manga.genres.ilike(f'%"{tag}%'))
+        # tags arrive as genre slugs/names; resolve to ids via the genre table
+        # then match any manga whose genre_ids array overlaps the resolved ids.
+        resolved = select(Genre.id).where(Genre.slug.in_(tags) | Genre.name.in_(tags))
+        stmt = stmt.where(Manga.genre_ids.op("&&")(resolved))
+    if author:
+        stmt = stmt.join(
+            MangaCreator, MangaCreator.manga_id == Manga.id
+        ).where(MangaCreator.creator_id == author)
     return stmt
 
 
-def _apply_manga_order(stmt, order_by: Optional[str]):
-    desc = order_by.startswith("-") if order_by else False
-    key = order_by[1:] if desc else order_by
+def _apply_manga_order(stmt, order_by: Optional[str], order_dir: str = "desc"):
+    desc = order_dir == "desc"
+    key = order_by or "trending"
+    if key in ("trending", "reader_count"):
+        return stmt.order_by(Manga.reader_count.desc() if desc else Manga.reader_count)
+    if key in ("az", "alphabet", "title"):
+        return stmt.order_by(Manga.title.desc() if desc else Manga.title)
+    if key in ("views", "view", "views_daily", "views_weekly", "views_monthly"):
+        col = {
+            "views_daily": Manga.views_daily,
+            "views_monthly": Manga.views_monthly,
+        }.get(key, Manga.views_weekly)
+        return stmt.order_by(col.desc() if desc else col)
+    if key in ("score",):
+        return stmt.order_by(Manga.score.desc() if desc else Manga.score)
     if key in ("latest", "updated_at"):
         return stmt.order_by(Manga.updated_at.desc() if desc else Manga.updated_at)
-    if key in ("az", "title"):
-        return stmt.order_by(Manga.title.desc() if desc else Manga.title)
     if key in ("created", "created_at"):
         return stmt.order_by(Manga.created_at.desc() if desc else Manga.created_at)
-    return stmt.order_by(Manga.updated_at.desc())
+    return stmt.order_by(Manga.reader_count.desc())
 
 
 def get_manga_list(
@@ -37,11 +59,13 @@ def get_manga_list(
     limit: int = 20,
     offset: int = 0,
     tags: Optional[list[str]] = None,
+    author: Optional[UUID] = None,
     order_by: Optional[str] = None,
+    order_dir: str = "desc",
 ) -> list[Manga]:
     stmt = select(Manga)
-    stmt = _apply_manga_filters(stmt, None, tags)
-    stmt = _apply_manga_order(stmt, order_by)
+    stmt = _apply_manga_filters(stmt, None, tags, author=author)
+    stmt = _apply_manga_order(stmt, order_by, order_dir)
     stmt = stmt.limit(limit).offset(offset)
     return list(session.exec(stmt).all())
 
@@ -52,17 +76,72 @@ def search_manga(
     limit: int = 20,
     offset: int = 0,
     tags: Optional[list[str]] = None,
+    author: Optional[UUID] = None,
     order_by: Optional[str] = None,
+    order_dir: str = "desc",
 ) -> list[Manga]:
     stmt = select(Manga)
-    stmt = _apply_manga_filters(stmt, query, tags)
-    stmt = _apply_manga_order(stmt, order_by)
+    stmt = _apply_manga_filters(stmt, query, tags, author=author)
+    stmt = _apply_manga_order(stmt, order_by, order_dir)
     stmt = stmt.limit(limit).offset(offset)
     return list(session.exec(stmt).all())
 
 
 def get_manga_by_id(session: Session, manga_id: UUID) -> Optional[Manga]:
     return session.get(Manga, manga_id)
+
+
+def get_manga_creators(session: Session, manga_id: UUID) -> list[Creator]:
+    stmt = (
+        select(Creator)
+        .join(MangaCreator, MangaCreator.creator_id == Creator.id)
+        .where(MangaCreator.manga_id == manga_id)
+        .order_by(Creator.role, Creator.name)
+    )
+    return list(session.exec(stmt).all())
+
+
+def list_genres(
+    session: Session,
+    q: Optional[str] = None,
+    order_by: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Genre]:
+    stmt = select(Genre)
+    if q:
+        q_lower = q.lower()
+        stmt = stmt.where(Genre.slug.ilike(f"{q_lower}%") | Genre.name.ilike(f"{q_lower}%"))
+    if order_by == "az":
+        stmt = stmt.order_by(Genre.name)
+    elif order_by == "-az":
+        stmt = stmt.order_by(Genre.name.desc())
+    else:
+        stmt = stmt.order_by(Genre.name)
+    stmt = stmt.limit(limit).offset(offset)
+    return list(session.exec(stmt).all())
+
+
+def list_creators(
+    session: Session,
+    q: Optional[str] = None,
+    role: Optional[str] = None,
+    order_by: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Creator]:
+    stmt = select(Creator)
+    if q:
+        q_lower = q.lower()
+        stmt = stmt.where(Creator.slug.ilike(f"{q_lower}%") | Creator.name.ilike(f"{q_lower}%"))
+    if role:
+        stmt = stmt.where(Creator.role == role)
+    if order_by in ("az", None):
+        stmt = stmt.order_by(Creator.name)
+    elif order_by == "-az":
+        stmt = stmt.order_by(Creator.name.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    return list(session.exec(stmt).all())
 
 
 def get_manga_with_chapters(session: Session, manga_id: UUID) -> Optional[Manga]:
@@ -82,7 +161,7 @@ def upsert_manga(
     cover: Optional[str] = None,
     description: Optional[str] = None,
     status: Optional[str] = None,
-    genres: Optional[str] = None,
+    genre_ids: Optional[list[int]] = None,
 ) -> Manga:
     manga = session.get(Manga, manga_id)
 
@@ -91,7 +170,7 @@ def upsert_manga(
         manga.cover = cover or manga.cover
         manga.description = description or manga.description
         manga.status = status or manga.status
-        manga.genres = genres or manga.genres
+        manga.genre_ids = genre_ids or manga.genre_ids
         manga.updated_at = datetime.now(timezone.utc)
     else:
         manga = Manga(
@@ -102,7 +181,7 @@ def upsert_manga(
             cover=cover,
             description=description,
             status=status,
-            genres=genres,
+            genre_ids=genre_ids or [],
         )
         session.add(manga)
 
@@ -174,28 +253,39 @@ def upsert_chapter(
 # OCR
 # ─────────────────────────────────────────────────────────────
 
-def get_ocr_result(session: Session, chapter_id: UUID) -> Optional[OCRResult]:
-    stmt = select(OCRResult).where(OCRResult.chapter_id == chapter_id)
-    return session.exec(stmt).first()
+def get_ocr_pages_for_chapter(session: Session, chapter_id: UUID) -> list[OCRResult]:
+    """Return every OCR page row for a chapter ordered by page_number."""
+    stmt = (
+        select(OCRResult)
+        .where(OCRResult.chapter_id == chapter_id)
+        .order_by(OCRResult.page_number)
+    )
+    return list(session.exec(stmt).all())
 
 
 def get_ocr_result_with_user(
-    session: Session, chapter_id: UUID
-) -> Optional[tuple[OCRResult, Optional[User]]]:
-    result = get_ocr_result(session, chapter_id)
-    if not result:
+    session: Session, chapter_id: UUID, offset: int = 0, limit: int = 50
+) -> Optional[tuple[list[OCRResult], Optional[UUID]]]:
+    pages = get_ocr_pages_for_chapter(session, chapter_id)
+    if not pages:
         return None
-    user = session.get(User, result.ocr_by) if result.ocr_by else None
-    return result, user
+    window = pages[offset:offset + limit]
+    ocr_by = next((p.ocr_by for p in pages if p.ocr_by), None)
+    return window, ocr_by
 
 
-def save_ocr_result(
+def save_ocr_page(
     session: Session,
     chapter_id: UUID,
+    page_number: int,
     ocr_data: str,
     ocr_by: Optional[UUID] = None,
 ) -> OCRResult:
-    existing = get_ocr_result(session, chapter_id)
+    stmt = select(OCRResult).where(
+        OCRResult.chapter_id == chapter_id,
+        OCRResult.page_number == page_number,
+    )
+    existing = session.exec(stmt).first()
 
     if existing:
         existing.ocr_data = ocr_data
@@ -205,6 +295,7 @@ def save_ocr_result(
     else:
         existing = OCRResult(
             chapter_id=chapter_id,
+            page_number=page_number,
             ocr_data=ocr_data,
             ocr_by=ocr_by,
         )
@@ -215,9 +306,34 @@ def save_ocr_result(
     return existing
 
 
-# ─────────────────────────────────────────────────────────────
-# HISTORY
-# ─────────────────────────────────────────────────────────────
+def delete_ocr_result(session: Session, chapter_id: UUID) -> bool:
+    pages = get_ocr_pages_for_chapter(session, chapter_id)
+    if not pages:
+        return False
+    for p in pages:
+        session.delete(p)
+    session.commit()
+    return True
+
+
+def delete_read_history_by_id(
+    session: Session,
+    history_id: UUID,
+    user_id: UUID,
+) -> bool:
+    stmt = select(ReadHistory).where(
+        ReadHistory.id == history_id,
+        ReadHistory.user_id == user_id,
+    )
+    history = session.exec(stmt).first()
+
+    if not history:
+        return False
+
+    session.delete(history)
+    session.commit()
+    return True
+
 
 class ReadHistoryRow:
     """Flat projection of history + manga + chapter for response building."""
@@ -306,17 +422,6 @@ def delete_read_history(
     session.delete(history)
     session.commit()
     return True
-
-
-def delete_read_history_by_id(
-    session: Session,
-    history_id: UUID,
-    user_id: UUID,
-) -> bool:
-    stmt = select(ReadHistory).where(
-        ReadHistory.id == history_id,
-        ReadHistory.user_id == user_id,
-    )
     history = session.exec(stmt).first()
 
     if not history:
@@ -327,55 +432,9 @@ def delete_read_history_by_id(
     return True
 
 
-def delete_ocr_result(session: Session, chapter_id: UUID) -> bool:
-    stmt = select(OCRResult).where(OCRResult.chapter_id == chapter_id)
-    ocr_result = session.exec(stmt).first()
-
-    if not ocr_result:
-        return False
-
-    session.delete(ocr_result)
-    session.commit()
-    return True
-
-
 # ─────────────────────────────────────────────────────────────
 # OCR BACKFILL (GiNZA analysis on existing OCR data)
 # ─────────────────────────────────────────────────────────────
 
 def get_all_ocr_results(session: Session) -> list[OCRResult]:
     return list(session.exec(select(OCRResult)).all())
-
-
-def backfill_ocr_analysis(session: Session) -> int:
-    """Run GiNZA tokenization + dependency analysis on every stored OCR result
-    that does not already carry analysis data, and persist it back into
-    ``ocr_data``. Returns the number of chapters processed.
-    """
-    from ...manga_reader.manga_ocr import analyze_ocr_page
-    from ...manga_reader.schema import OCRPage
-
-    count = 0
-    for ocr_result in get_all_ocr_results(session):
-        data = json.loads(ocr_result.ocr_data)
-        pages = data.get("pages", [])
-        # A page needs (re)analysis if any block is missing its `analyze`.
-        needs_analysis = any(
-            any("analyze" not in block for block in page.get("blocks", []))
-            for page in pages
-        )
-        if not needs_analysis:
-            continue
-
-        analyzed_pages = []
-        for page in pages:
-            page.pop("analyze", None)  # page-level analysis is redundant; block-level is authoritative
-            analyzed_pages.append(analyze_ocr_page(OCRPage.model_validate(page)).model_dump())
-
-        ocr_result.ocr_data = json.dumps({"pages": analyzed_pages})
-        session.add(ocr_result)
-        count += 1
-
-    if count:
-        session.commit()
-    return count

@@ -4,7 +4,7 @@ from sqlalchemy import text
 from fastapi import Depends
 import os
 from .user import User
-from .transcription import Transcript,TranscriptionHistory
+from .transcription import Video, Transcript
 from .manga_reader import *
 from .security import *
 from .tokenization import TokenizationHistory

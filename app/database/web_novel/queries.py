@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from uuid import UUID
 from typing import Optional, List
 
-from .schema import WebNovel, WebNovelChapter
+from .schema import WebNovel, WebNovelChapter, WebNovelReadHistory
 
 
 def search_web_novels(session: Session, query: str, limit: int = 20, offset: int = 0) -> list[WebNovel]:
@@ -82,3 +82,58 @@ def update_chapter_content(
     session.commit()
     session.refresh(chapter)
     return chapter
+
+
+# ── Read History ─────────────────────────────────────────────────────────────
+
+def get_web_novel_read_histories(session: Session, user_id: UUID) -> list[WebNovelReadHistory]:
+    stmt = (
+        select(WebNovelReadHistory)
+        .where(WebNovelReadHistory.user_id == user_id)
+        .order_by(WebNovelReadHistory.updated_at.desc())
+    )
+    return list(session.exec(stmt).all())
+
+
+def get_web_novel_read_history(
+    session: Session, user_id: UUID, web_novel_id: UUID
+) -> Optional[WebNovelReadHistory]:
+    return session.exec(
+        select(WebNovelReadHistory).where(
+            WebNovelReadHistory.user_id == user_id,
+            WebNovelReadHistory.web_novel_id == web_novel_id,
+        )
+    ).first()
+
+
+def upsert_web_novel_read_history(
+    session: Session,
+    user_id: UUID,
+    web_novel_id: UUID,
+    chapter_id: UUID,
+) -> WebNovelReadHistory:
+    history = get_web_novel_read_history(session, user_id, web_novel_id)
+    if history:
+        history.chapter_id = chapter_id
+        history.updated_at = datetime.now(timezone.utc)
+    else:
+        history = WebNovelReadHistory(
+            user_id=user_id,
+            web_novel_id=web_novel_id,
+            chapter_id=chapter_id,
+        )
+        session.add(history)
+    session.commit()
+    session.refresh(history)
+    return history
+
+
+def delete_web_novel_read_history(
+    session: Session, user_id: UUID, web_novel_id: UUID
+) -> bool:
+    history = get_web_novel_read_history(session, user_id, web_novel_id)
+    if not history:
+        return False
+    session.delete(history)
+    session.commit()
+    return True

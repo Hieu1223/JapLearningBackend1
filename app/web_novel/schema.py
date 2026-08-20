@@ -28,3 +28,16 @@ class CreateWebNovelRequest(SQLModel):
 class CreateChapterRequest(SQLModel):
     name: str
     content: Optional[str] = None
+
+
+class WebNovelReadHistoryResponse(SQLModel):
+    id: UUID
+    user_id: UUID
+    web_novel_id: UUID
+    chapter_id: UUID
+    updated_at: datetime
+
+
+class WebNovelReadHistoryUpdate(SQLModel):
+    web_novel_id: UUID
+    chapter_id: UUID

@@ -1,6 +1,18 @@
 from pydantic import BaseModel
 from typing import Optional,List
 from datetime import datetime
+from uuid import UUID
+
+
+class VideoProgressResponse(BaseModel):
+    video_id: UUID
+    progress: float
+    updated_at: datetime
+
+
+class SaveVideoProgressRequest(BaseModel):
+    video_id: UUID
+    progress: float
 
 
 
@@ -27,6 +39,10 @@ class VideoPreview(BaseModel):
     duration: Optional[str]
     description: Optional[str]
     view_count: Optional[int] = None
+    # App-internal video uuid (created on preview) used for transcription jobs.
+    app_video_id: Optional[UUID] = None
+    # Whether the app already has a transcript saved for this video.
+    has_transcript: bool = False
     @staticmethod
     def _short_description(data: dict) -> Optional[str]:
         desc = data.get("description")

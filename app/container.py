@@ -37,7 +37,7 @@ class Container:
     @property
     def transcription_service(self):
         if 'transcription' not in self._services:
-            from .transcription.service import TranscriptionService
+            from .transcription.service.transcription_service import TranscriptionService
             self._services['transcription'] = TranscriptionService()
         return self._services['transcription']
     

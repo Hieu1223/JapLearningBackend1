@@ -1,16 +1,15 @@
-import json
-import os
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from uuid import UUID
 
-from ..database.manga_reader.queries import backfill_ocr_analysis
 from ..security.auth import CurrentUser
 from ..container import Container, get_db_session
 from .schema import (
     MangaPreview,
     MangaDetail,
+    CreatorPreview,
+    GenrePreview,
     ReadResponse,
     OCRResultResponse,
     ReadHistoryUpdate,
@@ -21,34 +20,19 @@ router = APIRouter(tags=["Manga"])
 
 _container = Container()
 
-TAGS_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "asset", "tags.json"
-)
 
-try:
-    with open(TAGS_FILE, "r", encoding="utf-8") as _f:
-        _ALL_TAGS = json.load(_f).get("tags", [])
-except (FileNotFoundError, json.JSONDecodeError):
-    _ALL_TAGS = []
-
-
-def _order_tags(tags: list[str], order_by: Optional[str]) -> list[str]:
-    desc = order_by.startswith("-") if order_by else False
-    key = order_by[1:] if desc else order_by
-    if key in ("az", "name", "title", None):
-        return sorted(tags, reverse=desc)
-    if key in ("len", "length"):
-        return sorted(tags, key=len, reverse=desc)
-    return sorted(tags, reverse=desc)
-
-
-@router.get("/manga", response_model=list[MangaPreview], tags=["Manga"], description="List manga with optional text search, genre tag filter and pagination")
+@router.get("", response_model=list[MangaPreview], tags=["Manga"], description="List manga with optional text search, genre filter and pagination")
 async def list_manga(
     q: Optional[str] = Query(default=None),
-    tags: Optional[list[str]] = Query(default=None, description="Filter by one or more genres"),
+    genres: Optional[list[str]] = Query(default=None, description="Filter by one or more genre slugs or names"),
+    author: Optional[UUID] = Query(default=None, description="Filter by creator (author/artist) id"),
     order_by: Optional[str] = Query(
-        default=None,
-        description="Sort order: latest (newest update), -latest (oldest update), az (A-Z title), -az (Z-A title), created (oldest first), -created (newest first)",
+        default="trending",
+        description="Sort field: trending, alphabet (az), views (view), latest (updated_at), created (created_at)",
+    ),
+    order_dir: str = Query(
+        default="desc",
+        description="Sort direction: asc or desc",
     ),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -59,27 +43,44 @@ async def list_manga(
         query=q,
         limit=limit,
         offset=offset,
-        tags=tags,
+        tags=genres,
+        author=author,
         order_by=order_by,
+        order_dir=order_dir,
     )
 
 
-@router.get("/tags", response_model=list[str], tags=["Manga"], description="List all available manga genre tags with optional prefix search, ordering and pagination")
-async def list_tags(
-    q: Optional[str] = Query(default=None, description="Case-insensitive prefix filter on tag name"),
+@router.get("/genres", response_model=list[GenrePreview], tags=["Manga"], description="List manga genres from the database with optional prefix search, ordering and pagination")
+async def list_genres(
+    q: Optional[str] = Query(default=None, description="Case-insensitive prefix filter on genre name or slug"),
     order_by: Optional[str] = Query(
-        default=None,
-        description="Sort order: az (A-Z), -az (Z-A), len (shortest first), -len (longest first)",
+        default="az",
+        description="Sort order: az (A-Z), -az (Z-A)",
     ),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
-    tags = _ALL_TAGS
-    if q:
-        q_lower = q.lower()
-        tags = [t for t in tags if t.lower().startswith(q_lower)]
-    tags = _order_tags(tags, order_by)
-    return tags[offset:offset + limit]
+    session = get_db_session()
+    return _container.manga_reader_service.get_genres(
+        session, q=q, order_by=order_by, limit=limit, offset=offset
+    )
+
+
+@router.get("/creators", response_model=list[CreatorPreview], tags=["Manga"], description="List manga creators (authors/artists) with optional name search, role filter and pagination")
+async def list_creators(
+    q: Optional[str] = Query(default=None, description="Case-insensitive prefix filter on creator name or slug"),
+    role: Optional[str] = Query(default=None, description="Filter by role: author or artist"),
+    order_by: Optional[str] = Query(
+        default="az",
+        description="Sort order: az (A-Z), -az (Z-A)",
+    ),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+):
+    session = get_db_session()
+    return _container.manga_reader_service.get_creators(
+        session, q=q, role=role, order_by=order_by, limit=limit, offset=offset
+    )
 
 
 @router.get("/manga/{manga_id}", response_model=MangaDetail, tags=["Manga"], description="Fetch the full metadata and chapter list for a single manga")
@@ -251,17 +252,5 @@ async def reset_ocr(
     session = get_db_session()
     result = _container.manga_reader_service.reset_ocr(session, chapter_id)
     if not result:
-        raise HTTPException(
-            status_code=404,
-            detail="No OCR result found for this chapter.",
-        )
+        raise HTTPException(status_code=404, detail="No OCR result found for this chapter.")
     return {"success": True}
-
-
-@router.post("/ocr/backfill-analysis", tags=["Manga"], description="Run GiNZA tokenization + dependency analysis on all existing OCR data that lacks it, and persist the augmented results")
-async def backfill_ocr_analysis_route(
-    user: CurrentUser,
-):
-    session = get_db_session()
-    processed = backfill_ocr_analysis(session)
-    return {"success": True, "chapters_processed": processed}

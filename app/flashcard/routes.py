@@ -18,6 +18,7 @@ from .schema import (
     ReviewSessionResponse,
     ReviewSessionWithSrsResponse,
     AddVocabRequest,
+    CreateDeckRequest,
     PublicDeckResponse,
 )
 
@@ -54,12 +55,11 @@ def read_decks(
 
 @router.post("/decks", response_model=DeckWithStatsResponse, tags=["Decks"], description="Create a new, empty flashcard deck for the current user, optionally marking it public so others can copy it")
 def create_deck(
-    name: str,
-    public: bool = False,
+    req: CreateDeckRequest,
     user_id: CurrentUser = None,
 ):
     session = get_db_session()
-    return _container.flashcard_service.create_deck(session, user_id, name, public)
+    return _container.flashcard_service.create_deck(session, user_id, req.name, req.public)
 
 
 @router.patch("/decks/{deck_id}", response_model=DeckResponse, tags=["Decks"], description="Rename an existing deck; only the deck's owner may change its name")

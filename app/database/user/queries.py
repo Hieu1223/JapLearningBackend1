@@ -78,7 +78,7 @@ def get_user_settings(session: Session, user_id: UUID) -> UserSettings | None:
 def create_or_update_user_settings(
     session: Session,
     user_id: UUID,
-    settings: str,
+    settings: dict,
 ) -> UserSettings:
     settings_entry = get_user_settings(session, user_id)
     if not settings_entry:

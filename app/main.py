@@ -12,6 +12,7 @@ if sys.platform.startswith("win"):
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request, Response
 from .routes import *
+from .monitoring import router as monitoring_router
 from .user_management import *
 from .database import create_db_and_tables, Session, engine
 
@@ -55,3 +56,4 @@ app.include_router(flashcard_router, prefix='/flashcard', tags=["Flashcard"])
 app.include_router(manga_reader_router, prefix='/manga')
 app.include_router(web_novel_router, prefix='/web-novel')
 app.include_router(proxy_router, prefix='')
+app.include_router(monitoring_router, prefix='/monitor', tags=["Monitoring"])

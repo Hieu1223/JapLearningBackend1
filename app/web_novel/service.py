@@ -10,10 +10,14 @@ from ..database.web_novel.queries import (
     create_web_novel,
     create_chapter,
     update_chapter_content,
+    get_web_novel_read_histories,
+    upsert_web_novel_read_history,
+    delete_web_novel_read_history,
 )
 from .schema import (
     WebNovelResponse,
     WebNovelChapterResponse,
+    WebNovelReadHistoryResponse,
 )
 
 
@@ -98,3 +102,39 @@ class WebNovelService:
         chapter_id: UUID,
     ) -> Optional[WebNovelChapterResponse]:
         return self.get_chapter_by_id(session, chapter_id)
+
+    def get_read_histories(
+        self, session: Session, user_id: UUID
+    ) -> list[WebNovelReadHistoryResponse]:
+        rows = get_web_novel_read_histories(session, user_id)
+        return [
+            WebNovelReadHistoryResponse(
+                id=row.id,
+                user_id=row.user_id,
+                web_novel_id=row.web_novel_id,
+                chapter_id=row.chapter_id,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
+    def upsert_read_history(
+        self,
+        session: Session,
+        user_id: UUID,
+        web_novel_id: UUID,
+        chapter_id: UUID,
+    ) -> WebNovelReadHistoryResponse:
+        history = upsert_web_novel_read_history(session, user_id, web_novel_id, chapter_id)
+        return WebNovelReadHistoryResponse(
+            id=history.id,
+            user_id=history.user_id,
+            web_novel_id=history.web_novel_id,
+            chapter_id=history.chapter_id,
+            updated_at=history.updated_at,
+        )
+
+    def delete_read_history(
+        self, session: Session, user_id: UUID, web_novel_id: UUID
+    ) -> bool:
+        return delete_web_novel_read_history(session, user_id, web_novel_id)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict
 from typing import List, Tuple, Optional
 from uuid import UUID
@@ -38,6 +40,9 @@ class Token(BaseModel):
     word_id: int
     begin: int
     end: int
+    # WhisperX word-level timestamps aligned to this GiNZA token.
+    start: Optional[float] = None
+    stop: Optional[float] = None
     dep: Optional[str] = None
     dep_description: Optional[str] = None
     head_index: Optional[int] = None
@@ -46,6 +51,8 @@ class Token(BaseModel):
 
 class TokenList(BaseModel):
     tokens: List[Token]
+    # GiNZA dependency tree (one per sentence) produced alongside tokenization.
+    sentences: List[DependencyTree] = []
 
 
 class DependencyLink(BaseModel):
@@ -72,21 +79,20 @@ class DependencyTreeResponse(BaseModel):
     sentences: List[DependencyTree]
 
 
-class TokenizeDependenciesRequest(BaseModel):
+class SaveTokenizationRequest(BaseModel):
     text: str
-    user_id: UUID
 
 
-class TokenizeDependenciesResponse(BaseModel):
+class SaveTokenizationResponse(BaseModel):
     history_id: UUID
-    text: str
+    tokens: List[Token]
     sentences: List[DependencyTree]
 
 
 class TokenizationHistoryItem(BaseModel):
     history_id: UUID
     text: str
-    sentences: int
+    sentence_count: int
     date_created: datetime
 
 

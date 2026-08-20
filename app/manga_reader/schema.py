@@ -75,6 +75,13 @@ class MangaPreview(BaseModel):
     title: str
     cover: Optional[str]
     status: Optional[str]
+    alternative_title: Optional[str]
+    description: Optional[str]
+    genre_ids: Optional[List[int]] = None
+    score: Optional[float]
+    views_weekly: Optional[int]
+    reader_count: Optional[int]
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -85,9 +92,42 @@ class MangaDetail(BaseModel):
     title: str
     cover: Optional[str]
     status: Optional[str]
+    alternative_title: Optional[str]
     description: Optional[str]
-    genres: Optional[str]
+    description_native: Optional[str]
+    manga_type: Optional[str]
+    genre_ids: Optional[List[int]] = None
+    released: Optional[str]
+    serialization: Optional[str]
+    score: Optional[float]
+    views_daily: Optional[int]
+    views_weekly: Optional[int]
+    views_monthly: Optional[int]
+    reader_count: Optional[int]
+    published_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    creators: List["CreatorPreview"] = []
     chapters: List[ChapterPreview]
+
+    class Config:
+        from_attributes = True
+
+
+class CreatorPreview(BaseModel):
+    id: UUID
+    source_term_id: int
+    slug: str
+    name: str
+    role: str
+
+    class Config:
+        from_attributes = True
+
+
+class GenrePreview(BaseModel):
+    id: int
+    slug: str
+    name: str
 
     class Config:
         from_attributes = True

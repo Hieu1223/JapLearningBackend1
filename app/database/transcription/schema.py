@@ -4,7 +4,8 @@ from sqlmodel import SQLModel, Field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from enum import Enum
-from fastapi import UploadFile,File,Form
+from fastapi import UploadFile, File, Form
+from ...tokenization.schema import Token
 
 
 class SupportedSite:
@@ -22,86 +23,98 @@ class TranscriptStatus(Enum):
 
 # ── Database Models ───────────────────────────────────────────────────────────
 
-class Transcript(SQLModel, table=True):
+class Video(SQLModel, table=True):
+    __tablename__ = "video"
     __table_args__ = {"extend_existing": True}
 
     id: UUID = Field(primary_key=True, default_factory=uuid4)
     original_source: str = Field(default=SupportedSite.FileUpload)
     resource_id: str | None = Field(default=None, index=True)
     resource_url: str = Field()
-    thumnail_url: str = Field()
+    thumbnail_url: str = Field()
     name: str = Field()
     date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    data: str | None = Field(default=None)
     status: int = Field(default=TranscriptStatus.Uploading.value, index=True)
     public: bool = Field(default=True)
     individual_settings: str | None = Field(default=None)
 
 
-class TranscriptionHistory(SQLModel, table=True):
+class Transcript(SQLModel, table=True):
+    __tablename__ = "transcript"
     __table_args__ = {"extend_existing": True}
 
     id: UUID = Field(primary_key=True, default_factory=uuid4)
-    user_id : UUID = Field(foreign_key="user.id") 
-    transcript_id: UUID | None = Field(default=None, foreign_key="transcript.id", index=True)
-    resource_id: str = Field(index=True)
-    original_source: str = Field(default=SupportedSite.Youtube)
-    name: str = Field()
-    thumbnail_url: str = Field()
-    resource_url: str = Field()
-    date_created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    video_id: UUID = Field(
+        default=None,
+        foreign_key="video.id",
+        index=True,
+        ondelete="CASCADE",
+    )
+    transcribed_by: UUID | None = Field(default=None, foreign_key="user.id")
+    transcript_data: str | None = Field(default="{}")
+    status: int = Field(default=TranscriptStatus.Uploading.value, index=True)
+    transcript_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class VideoProgress(SQLModel, table=True):
+    __tablename__ = "videoprogress"
     __table_args__ = {"extend_existing": True}
 
     id: UUID = Field(primary_key=True, default_factory=uuid4)
     user_id: UUID = Field(foreign_key="user.id")
-    resource_id: str = Field(index=True)
-    original_source: str = Field(default=SupportedSite.Youtube)
-    current_page: int = Field(default=0)
+    video_id: UUID = Field(
+        default=None,
+        foreign_key="video.id",
+        index=True,
+        ondelete="CASCADE",
+    )
+    progress: float = Field(default=0.0)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
 class YoutubeIDTranscriptRequestForm(BaseModel):
-    resource_id : str
+    resource_id: str
+
 
 class YoutubeTranscriptRequestForm(BaseModel):
     name: str
     resource_id: str | None = None
     original_source: str = SupportedSite.Youtube
     public: bool = True
-    thumbnail_url : str
-    resource_url : str
+    thumbnail_url: str
+    resource_url: str
     user_id: UUID
-    
 
 
 class TranscriptRequestResponse(BaseModel):
     transcript_id: UUID
+    video_id: UUID
     success: bool
 
 
 class TranscriptStatusRequest(BaseModel):
-    transcript_id : UUID
+    transcript_id: UUID
 
 
 class TranscriptStatusResponse(BaseModel):
     done: bool
     msg: str
 
+
 class TranscriptInfoRequest(BaseModel):
-    transcript_id : UUID
+    transcript_id: UUID
 
 
 class TranscriptInfoResponse(BaseModel):
     id: UUID
+    video_id: UUID | None
     original_source: str
-    thumnail_url: str
+    thumbnail_url: str
     resource_url: str
     resource_id: str | None
+    name: str
     status: int
 
 
@@ -110,21 +123,21 @@ class TokenTimestamp(BaseModel):
     end: float | None
     token: str
 
-class TranscriptSegment(BaseModel):
-    text : str
-    words: list[TokenTimestamp]
 
 class TranscriptResult(BaseModel):
-    segments : list[TranscriptSegment]
+    # One list of GiNZA Tokens (with WhisperX timestamps) per transcript segment.
+    segments: list[list[Token]]
 
 
 class ErrorMessage(BaseModel):
     msg: str
 
+
 # ── History Request / Response schemas ───────────────────────────────────────
 
 class UserHistoryResponse(BaseModel):
     history_id: UUID
+    video_id: UUID | None
     transcript_id: UUID | None
     name: str
     thumbnail_url: str
@@ -132,6 +145,7 @@ class UserHistoryResponse(BaseModel):
     date_created: datetime
     status: int | None = None
     is_transcribed: bool = False
+
 
 class UserHistoryListResponse(BaseModel):
     items: list[UserHistoryResponse]
@@ -142,61 +156,23 @@ class RemoveHistoryRequest(BaseModel):
     history_id: UUID
 
 
-class VideoDetail(BaseModel):
-    id: str
-    title: str
-    thumbnail_url: Optional[str]
-    channel: Optional[str] = None
-    duration: Optional[float] = None
-
-    @staticmethod
-    def from_dict(data: dict) -> "VideoDetail":
-        channel = data.get("channel", {})
-        channel_name = None
-        if isinstance(channel, dict):
-            channel_name = channel.get("name")
-        elif isinstance(channel, str):
-            channel_name = channel
-
-        thumbnails = data.get("thumbnails") or []
-        thumbnail_url = None
-        if thumbnails:
-            thumbnail_url = thumbnails[-1].get("url") if isinstance(thumbnails[-1], dict) else None
-
-        return VideoDetail(
-            id=data.get("id"),
-            title=data.get("title"),
-            thumbnail_url=thumbnail_url or data.get("thumbnail"),
-            channel=channel_name,
-            duration=data.get("duration"),
-        )
-
-
 class TranscriptDetailResponse(BaseModel):
     id: UUID
-    original_source: str
-    thumnail_url: str
-    resource_url: str
-    resource_id: str | None
     status: int
     done: bool
     msg: str
-    video: VideoDetail | None = None
     data: TranscriptResult | None = None
-    individual_settings: dict | None = None
 
 
 class VideoProgressResponse(BaseModel):
-    resource_id: str
-    original_source: str
-    current_page: int
+    video_id: UUID
+    progress: float
     updated_at: datetime
 
 
 class SaveVideoProgressRequest(BaseModel):
-    resource_id: str
-    original_source: str
-    current_page: int
+    video_id: UUID
+    progress: float
 
 
 class SaveIndividualSettingsRequest(BaseModel):

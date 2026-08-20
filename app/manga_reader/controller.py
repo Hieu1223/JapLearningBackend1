@@ -2,6 +2,7 @@ import json
 from uuid import UUID
 from typing import Optional, AsyncIterator
 from sqlmodel import Session
+from datetime import datetime, timezone
 from fastapi import BackgroundTasks
 
 from ..database.manga_reader.queries import (
@@ -11,7 +12,8 @@ from ..database.manga_reader.queries import (
     get_chapter_by_id,
     get_chapters_for_manga,
     get_ocr_result_with_user,
-    save_ocr_result,
+    get_ocr_pages_for_chapter,
+    save_ocr_page,
     delete_ocr_result,
     get_read_histories,
     upsert_read_history,
@@ -19,6 +21,7 @@ from ..database.manga_reader.queries import (
 )
 from .schema import (
     OCRResponse,
+    OCRPage,
     MangaPreview,
     MangaDetail,
     ChapterPreview,
@@ -27,7 +30,7 @@ from .schema import (
     OCRUserInfo,
     ReadHistoryResponse,
 )
-from .manga_ocr import do_ocr_stream
+from .manga_ocr import do_ocr_stream, analyze_ocr_page
 
 
 # ─────────────────────────────────────────────────────────────
@@ -105,7 +108,7 @@ def ctrl_get_manga_detail(session: Session, manga_id: UUID) -> Optional[MangaDet
         cover=manga.cover,
         status=manga.status,
         description=manga.description,
-        genres=manga.genres,
+        genre_ids=manga.genre_ids,
         chapters=[_chapter_preview(c) for c in chapters],
     )
 
@@ -144,12 +147,14 @@ def ctrl_read_chapter(session: Session, chapter_id: UUID) -> Optional[ReadRespon
 def ctrl_get_existing_ocr(
     session: Session,
     chapter_id: UUID,
+    offset: int = 0,
+    limit: int = 50,
 ) -> Optional[OCRResultResponse]:
-    row = get_ocr_result_with_user(session, chapter_id)
+    row = get_ocr_result_with_user(session, chapter_id, offset, limit)
     if not row:
         return None
 
-    ocr_result, user = row
+    window, ocr_by = row
 
     chapter = get_chapter_by_id(session, chapter_id)
     if not chapter:
@@ -159,12 +164,17 @@ def ctrl_get_existing_ocr(
     if not manga:
         return None
 
+    all_pages = [json.loads(p.ocr_data) for p in window]
+    total_pages = len(get_ocr_pages_for_chapter(session, chapter_id))
+
     return OCRResultResponse(
         chapter_id=chapter_id,
-        ocr_date=ocr_result.ocr_date,
-        ocr_by=OCRUserInfo(id=user.id, display_name=user.display_name) if user else None,
-        manga=_manga_preview(manga),
-        ocr_data=OCRResponse.model_validate(json.loads(ocr_result.ocr_data)),
+        ocr_date=window[-1].ocr_date if window else datetime.now(timezone.utc),
+        ocr_by=OCRUserInfo(id=ocr_by) if ocr_by else None,
+        total_pages=total_pages,
+        offset=offset,
+        limit=limit,
+        ocr_data=OCRResponse(pages=[OCRPage.model_validate(p) for p in all_pages]),
     )
 
 
@@ -189,21 +199,25 @@ async def ctrl_stream_ocr(
     if not image_urls:
         raise ValueError("Chapter has no pages to OCR")
 
-    accumulated: list[dict] = []
+    accumulated: list[tuple[int, dict]] = []
 
     def _save_to_db():
-        save_ocr_result(
-            session,
-            chapter_id=chapter_id,
-            ocr_data=json.dumps({"pages": accumulated}),
-            ocr_by=user_id,
-        )
+        for page_number, analyzed in accumulated:
+            save_ocr_page(
+                session,
+                chapter_id=chapter_id,
+                page_number=page_number,
+                ocr_data=json.dumps(analyzed),
+                ocr_by=user_id,
+            )
 
     background_tasks.add_task(_save_to_db)
 
-    async for page in do_ocr_stream(image_urls):
-        accumulated.append(page)
-        yield f"data: {json.dumps(page)}\n\n"
+    async for idx, page in enumerate(do_ocr_stream(image_urls)):
+        validated = OCRPage.model_validate(page)
+        analyzed = analyze_ocr_page(validated)
+        accumulated.append((idx, analyzed.model_dump()))
+        yield f"data: {json.dumps(analyzed.model_dump())}\n\n"
 
     yield "data: [DONE]\n\n"
 

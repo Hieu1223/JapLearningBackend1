@@ -101,9 +101,8 @@ class UserService:
         settings = get_user_settings(session, user_id)
         if not settings:
             return {}
-        return json.loads(settings.settings)
+        return settings.settings
 
     def save_user_settings(self, session: Session, user_id: UUID, settings: dict) -> dict:
-        settings_json = json.dumps(settings)
-        create_or_update_user_settings(session, user_id, settings_json)
+        create_or_update_user_settings(session, user_id, settings)
         return settings

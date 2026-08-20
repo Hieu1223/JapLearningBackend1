@@ -32,6 +32,11 @@ class AddVocabRequest(BaseModel):
     meaning: str = Field(..., min_length=1, description="The meaning of the word (e.g. Vietnamese/English definition)")
 
 
+class CreateDeckRequest(BaseModel):
+    name: str = Field(..., min_length=1, description="The deck name")
+    public: bool = False
+
+
 class SaveReviewRequest(BaseModel):
     """Payload from the frontend ts-fsrs scheduler.
 

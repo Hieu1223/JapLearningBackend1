@@ -13,7 +13,7 @@ from .schema import (
     SaveUserSettingsRequest,
 )
 
-router = APIRouter(tags=["User Management"],prefix='/user')
+router = APIRouter(tags=["User Management"], prefix='/user')
 
 _container = Container()
 
@@ -69,6 +69,7 @@ def get_user(
 
 @router.get("/", response_model=list[UserResponse], tags=["User Management"], description="List users with pagination support")
 def list_users(
+    user: CurrentUser,
     offset: int = 0,
     limit: int = 50
 ):

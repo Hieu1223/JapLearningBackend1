@@ -2,14 +2,20 @@ from .schema import *
 from sqlmodel import Session, select
 from uuid import UUID
 from datetime import datetime, timezone
+import json
 
 
 def save_tokenization_history(
-    session: Session, user_id: UUID, text: str, sentence_count: int
+    session: Session,
+    user_id: UUID,
+    text: str,
+    data_json: str | None,
+    sentence_count: int,
 ) -> TokenizationHistory:
     entry = TokenizationHistory(
         user_id=user_id,
         text=text,
+        data=data_json,
         sentences=sentence_count,
         date_created=datetime.now(timezone.utc),
     )

@@ -117,8 +117,20 @@ def build_dependency_tree(text: str) -> list[DependencyTree]:
     return sentences
 
 
-async def tokenize(text: str) -> list[Token]:
-    result: list[Token] = []
+async def tokenize(text: str) -> tuple[list[Token], list["DependencyTree"]]:
+    return _tokenize_impl(text)
+
+
+def _tokenize_impl(text: str) -> tuple[list[Token], list["DependencyTree"]]:
+    """Tokenize ``text`` into morphological ``Token``s and build the GiNZA
+    dependency tree of each sentence.
+
+    GiNZA/spaCy is run for both the token list and the dependency tree so the
+    two analyses stay aligned (same parser, same sentence splits). Returns a
+    ``(tokens, trees)`` tuple so a single call can persist both to history or
+    attach them to a transcript segment.
+    """
+    tokens: list[Token] = []
     sentences = split_japanese_sentences(text)
 
     for sent_id, sentence in enumerate(sentences):
@@ -128,7 +140,7 @@ async def tokenize(text: str) -> list[Token]:
             is_root = t.head == t
             end = offset + len(t.text)
             pos_parts = tuple(t.tag_.split("-")) if t.tag_ else (t.pos_,)
-            result.append(
+            tokens.append(
                 Token(
                     sentence_id=sent_id,
                     surface=t.text,
@@ -147,59 +159,6 @@ async def tokenize(text: str) -> list[Token]:
             )
             offset = end
 
-    return result
+    trees = build_dependency_tree(text)
 
-
-def merge_transcript_tokens(segments: list) -> list[list[dict]]:
-    """Tokenize each segment's text with GiNZA/spaCy and merge the morphemes
-    using the WhisperX word-level timestamps.
-
-    For every segment the WhisperX ``words`` (``{token, start, end}``) are
-    concatenated to rebuild the segment text and a char->timestamp map. GiNZA
-    then tokenizes that text, and each token is assigned the min start / max end
-    of the overlapping WhisperX words.
-
-    Returns a list (one per segment) of merged ``TokenTimestamp`` dicts
-    (``{token, start, end}``) in the same shape as the original ``words``.
-    """
-    merged_per_segment: list[list[dict]] = []
-
-    for segment in segments:
-        words = (
-            segment.get("words", [])
-            if isinstance(segment, dict)
-            else getattr(segment, "words", [])
-        )
-        # Build the segment text and a parallel char->timestamp map from the
-        # consecutive WhisperX words (each word token occupies len(token) chars).
-        seg_text = ""
-        char_start: list[Optional[float]] = []
-        char_end: list[Optional[float]] = []
-        for w in words:
-            token = w.get("token") if isinstance(w, dict) else getattr(w, "token", None)
-            start = w.get("start") if isinstance(w, dict) else getattr(w, "start", None)
-            end = w.get("end") if isinstance(w, dict) else getattr(w, "end", None)
-            seg_text += token
-            char_start.extend([start] * len(token))
-            char_end.extend([end] * len(token))
-
-        doc = load_nlp()(seg_text)
-        seg_merged: list[dict] = []
-        for t in doc:
-            b = t.idx
-            e = t.idx + len(t.text)
-            window_start = char_start[b:e]
-            window_end = char_end[b:e]
-            starts = [s for s in window_start if s is not None]
-            ends = [s for s in window_end if s is not None]
-            seg_merged.append(
-                {
-                    "token": t.text,
-                    "start": min(starts) if starts else None,
-                    "end": max(ends) if ends else None,
-                }
-            )
-
-        merged_per_segment.append(seg_merged)
-
-    return merged_per_segment
+    return tokens, trees
