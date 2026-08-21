@@ -10,6 +10,7 @@ from .schema import (
     MangaDetail,
     CreatorPreview,
     GenrePreview,
+    GenreListResponse,
     ReadResponse,
     OCRResultResponse,
     ReadHistoryUpdate,
@@ -50,7 +51,7 @@ async def list_manga(
     )
 
 
-@router.get("/genres", response_model=list[GenrePreview], tags=["Manga"], description="List manga genres from the database with optional prefix search, ordering and pagination")
+@router.get("/genres", response_model=GenreListResponse, tags=["Manga"], description="List manga genres from the database with optional prefix search, ordering and pagination")
 async def list_genres(
     q: Optional[str] = Query(default=None, description="Case-insensitive prefix filter on genre name or slug"),
     order_by: Optional[str] = Query(
@@ -61,9 +62,10 @@ async def list_genres(
     offset: int = Query(default=0, ge=0),
 ):
     session = get_db_session()
-    return _container.manga_reader_service.get_genres(
+    items = _container.manga_reader_service.get_genres(
         session, q=q, order_by=order_by, limit=limit, offset=offset
     )
+    return GenreListResponse(items=items, total=len(items))
 
 
 @router.get("/creators", response_model=list[CreatorPreview], tags=["Manga"], description="List manga creators (authors/artists) with optional name search, role filter and pagination")

@@ -118,7 +118,6 @@ def ctrl_get_manga_detail(session: Session, manga_id: UUID) -> Optional[MangaDet
         cover=manga.cover,
         status=manga.status,
         description=manga.description,
-        genre_ids=manga.genre_ids,
         genres=[_genre_preview(g) for g in list_genres_by_ids(session, manga.genre_ids or [])],
         chapters=[_chapter_preview(c) for c in chapters],
     )
