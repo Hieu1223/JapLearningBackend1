@@ -40,7 +40,7 @@ from .schema import (
 from .manga_ocr import do_ocr_stream, analyze_ocr_page
 
 
-def _manga_preview(manga) -> MangaPreview:
+def _manga_preview(manga, session: Session) -> MangaPreview:
     return MangaPreview(
         id=manga.id,
         title=manga.title,
@@ -115,7 +115,7 @@ class MangaReaderService:
             mangas = search_manga(session, query, limit, offset, tags=tags, author=author, order_by=order_by, order_dir=order_dir)
         else:
             mangas = get_manga_list(session, limit, offset, tags=tags, author=author, order_by=order_by, order_dir=order_dir)
-        return [_manga_preview(m) for m in mangas]
+        return [_manga_preview(m, session) for m in mangas]
 
     def get_genres(
         self,
@@ -186,7 +186,7 @@ class MangaReaderService:
         pages = _expand_pages_to_urls(payload)
 
         return ReadResponse(
-            manga=_manga_preview(manga),
+            manga=_manga_preview(manga, session),
             chapter=_chapter_preview(chapter),
             chapters=[_chapter_preview(c) for c in chapters],
             pages=pages,
