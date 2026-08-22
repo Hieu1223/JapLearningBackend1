@@ -1,7 +1,8 @@
-from typing import List, Dict, Any, Optional, Iterator
+from typing import List, Dict, Any, Optional, Iterator, Tuple
 from functools import lru_cache
 import json
 import os
+import heapq
 
 import marisa_trie
 
@@ -52,28 +53,39 @@ class Dictionary:
         word, kana, meaning, eid = payload.split(_FIELD_SEP)
         return {"id": eid, "word": word, "kana": kana, "suggest_mean": meaning}
 
-    def _search(
-        self, trie: marisa_trie.Trie, prefix: str, max_entries: int = 20
-    ) -> List[Dict[str, Any]]:
-        # Cap how many keys we collect before sorting, so a very broad prefix
-        # (e.g. a single character) stays cheap. The sort then promotes the
-        # shortest matching words, and we return the first ``max_entries``.
-        collect_cap = max(1000, max_entries * 10)
-
-        matched: List[Dict[str, Any]] = []
+    def _iter_unique(
+        self, trie: marisa_trie.Trie, prefix: str
+    ) -> Iterator[Dict[str, Any]]:
+        # ``iterkeys`` yields keys in DFS (lexicographic) order already, so we
+        # can stream matches one at a time without materializing the whole
+        # subtree. Dedup by entry id as we go.
         seen: set = set()
         for key in trie.iterkeys(prefix):
             payload = key.split(_PAYLOAD_SEP, 1)[1]
             eid = payload.rsplit(_FIELD_SEP, 1)[1]
             if eid not in seen:
                 seen.add(eid)
-                matched.append(self._to_entry(key))
-                if len(matched) >= collect_cap:
-                    break
+                yield self._to_entry(key)
 
-        # Lowest word count (shortest word) first.
-        matched.sort(key=lambda e: len(e["word"]))
-        return matched[:max_entries]
+    def _search(
+        self, trie: marisa_trie.Trie, prefix: str, max_entries: int = 20
+    ) -> List[Dict[str, Any]]:
+        # Keep only the ``max_entries`` shortest words seen so far in a bounded
+        # min-heap keyed by word length. This bounds memory to ``max_entries``
+        # entries regardless of how many keys the prefix matches.
+        heap: List[Tuple[int, int, Dict[str, Any]]] = []
+        for entry in self._iter_unique(trie, prefix):
+            length = len(entry["word"])
+            if len(heap) < max_entries:
+                heapq.heappush(heap, (length, len(heap), entry))
+            else:
+                # Replace the longest candidate if this word is shorter.
+                if length < heap[0][0]:
+                    heapq.heapreplace(heap, (length, len(heap), entry))
+
+        results = [item[2] for item in heap]
+        results.sort(key=lambda e: len(e["word"]))
+        return results
 
     def search(self, prefix: str, max_entries: int = 20) -> List[Dict[str, Any]]:
         results = self._search(self.word_trie, prefix, max_entries)
@@ -83,7 +95,7 @@ class Dictionary:
         remaining = max_entries - len(results)
         seen = {e["id"] for e in results}
         extra: List[Dict[str, Any]] = []
-        for e in self._search(self.reading_trie, prefix, remaining):
+        for e in self._iter_unique(self.reading_trie, prefix):
             eid = e["id"]
             if eid not in seen:
                 seen.add(eid)

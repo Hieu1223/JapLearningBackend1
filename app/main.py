@@ -4,6 +4,7 @@ import asyncio
 import sys
 from .transcription import recover_orphaned_transcript
 from .tokenization.tokenize import load_nlp
+from .tokenization.dictionary import get_dictionary
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -38,6 +39,7 @@ async def db_session_middleware(request: Request, call_next):
 @app.on_event("startup")
 def on_startup():
     load_nlp()
+    get_dictionary()
     create_db_and_tables()
     
     with Session(engine) as session:
