@@ -1,37 +1,14 @@
 from fastapi import APIRouter, Query
-from typing import List, Optional
-
-from pydantic import BaseModel
 
 from ..database import SessionDep
 from ..database.grammar import Grammar, search_grammar
+from .schema import GrammarEntry, GrammarLookupResponse
 
 router = APIRouter(tags=["grammar"])
 
 
-class ReibunItem(BaseModel):
-    ja: str
-    vn: str
-    romaji: str
-
-
-class GrammarEntry(BaseModel):
-    id: int
-    keyword: str
-    jp: str
-    imi_setsumei: str
-    tsukaikata_setsumei: str
-    reibun: List[ReibunItem]
-
-
-class GrammarLookupResponse(BaseModel):
-    query: str
-    results: List[GrammarEntry]
-    total: int
-
-
 @router.get(
-    "/grammar/lookup",
+    "/lookup",
     response_model=GrammarLookupResponse,
     tags=["grammar"],
     description="Search Japanese grammar points by keyword (fast trigram index on the keyword column). HTML markup in the fields is returned unmodified.",
