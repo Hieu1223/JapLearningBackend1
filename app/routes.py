@@ -7,3 +7,4 @@ from .manga_reader import router as manga_reader_router
 from .user_management import router as user_management_router
 from .web_novel import router as web_novel_router
 from .proxy import router as proxy_router
+from .grammar import router as grammar_router
