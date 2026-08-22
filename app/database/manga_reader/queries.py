@@ -2,7 +2,7 @@ import json
 from sqlmodel import Session, select
 from uuid import UUID
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Union
 
 from .schema import Manga, Chapter, OCRResult, ReadHistory, Genre, Creator, MangaCreator
 from ..user.schema import User
@@ -232,8 +232,17 @@ def upsert_chapter(
     title: str = "",
     chapter_index: Optional[int] = None,
     date: Optional[str] = None,
-    pages: Optional[list[str]] = None,
+    pages: Optional[Union[list[str], dict]] = None,
 ) -> Chapter:
+    # Normalize pages into the reconstruction payload understood by
+    # _expand_pages_to_urls (a dict with a "type" key). A bare list of image
+    # URLs is wrapped as a "direct" payload; an already-structured payload is
+    # stored as-is.
+    if isinstance(pages, list):
+        pages_payload: Union[dict, list] = {"type": "direct", "images": pages}
+    else:
+        pages_payload = pages if pages is not None else []
+
     chapter = session.get(Chapter, chapter_id)
 
     if chapter:
@@ -241,7 +250,7 @@ def upsert_chapter(
         chapter.chapter_index = chapter_index if chapter_index is not None else chapter.chapter_index
         chapter.date = date or chapter.date
         if pages is not None:
-            chapter.pages = json.dumps(pages)
+            chapter.pages = json.dumps(pages_payload)
     else:
         chapter = Chapter(
             id=chapter_id,
@@ -250,7 +259,7 @@ def upsert_chapter(
             title=title,
             chapter_index=chapter_index,
             date=date,
-            pages=json.dumps(pages or []),
+            pages=json.dumps(pages_payload),
         )
         session.add(chapter)
 

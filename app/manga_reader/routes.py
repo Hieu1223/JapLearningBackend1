@@ -132,7 +132,6 @@ Each event is a line "data: <json>\\n\\n" where <json> is an OCRPage augmented w
   "version": "1",
   "img_width": 100,
   "img_height": 100,
-  "analyze": [ DependencyTree, ... ],          // page-level trees (one per sentence)
   "blocks": [
     {
       "box": [x1, y1, x2, y2],
@@ -140,7 +139,7 @@ Each event is a line "data: <json>\\n\\n" where <json> is an OCRPage augmented w
       "font_size": 12.0,
       "lines_coords": [ [ [x, y], ... ] ],       // 4 points per line
       "lines": ["私は学生です。", "これは本です。"],
-      "analyze": [                               // one entry per line in `lines`
+      "analyze": [                               // one DependencyTree list per line in `lines`
         [ DependencyTree, ... ],
         [ DependencyTree, ... ]
       ]

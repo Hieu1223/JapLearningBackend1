@@ -224,8 +224,7 @@ async def ctrl_stream_ocr(
     background_tasks.add_task(_save_to_db)
 
     async for idx, page in enumerate(do_ocr_stream(image_urls)):
-        validated = OCRPage.model_validate(page)
-        analyzed = analyze_ocr_page(validated)
+        analyzed = analyze_ocr_page(page)
         accumulated.append((idx, analyzed.model_dump()))
         yield f"data: {json.dumps(analyzed.model_dump())}\n\n"
 
