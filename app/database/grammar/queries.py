@@ -12,3 +12,7 @@ def search_grammar(
         .order_by(Grammar.keyword)
         .limit(limit)
     ).all()
+
+
+def get_grammar(session: Session, grammar_id: int) -> Grammar | None:
+    return session.get(Grammar, grammar_id)

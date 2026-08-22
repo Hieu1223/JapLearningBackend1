@@ -9,6 +9,13 @@ class ReibunItem(BaseModel):
     romaji: str
 
 
+class GrammarSummary(BaseModel):
+    id: int
+    keyword: str
+    jp: str
+    imi_setsumei: str
+
+
 class GrammarEntry(BaseModel):
     id: int
     keyword: str
@@ -20,5 +27,9 @@ class GrammarEntry(BaseModel):
 
 class GrammarLookupResponse(BaseModel):
     query: str
-    results: List[GrammarEntry]
+    results: List[GrammarSummary]
     total: int
+
+
+class GrammarDetailResponse(BaseModel):
+    entry: GrammarEntry
